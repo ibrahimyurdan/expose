@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Expose",
+  "version": "0.1.0",
+  "identifier": "io.github.ibrahimyurdan.expose",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Expose",
+        "width": 380,
+        "height": 530,
+        "minWidth": 380,
+        "minHeight": 530,
+        "resizable": false,
+        "fullscreen": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "skipTaskbar": false,
+        "transparent": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https://ddragon.leagueoflegends.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Surface champ-select teammates, auto-accept queue pops, and dodge in one click",
+    "longDescription": "Expose is a lightweight tray companion for the League of Legends client. It surfaces the summoner names of your teammates during ranked champion select, can auto-accept queue ready checks, and offers a one-click dodge."
+  },
+  "plugins": {}
+}

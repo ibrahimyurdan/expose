@@ -1,0 +1,151 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+  expose runs as an always-dark hextech themed panel, so the palette lives
+  directly on :root instead of behind a light/dark switch. colors are the
+  well known league client tones: deep navy surfaces, parchment text, and a
+  gold accent with a darker gold for ornate borders.
+*/
+:root {
+  --radius: 0.3rem;
+
+  --background: #0a1428;
+  --foreground: #f0e6d2;
+
+  --card: #0f1c33;
+  --card-foreground: #f0e6d2;
+
+  --popover: #0c1830;
+  --popover-foreground: #f0e6d2;
+
+  --primary: #c8aa6e;
+  --primary-foreground: #0a1428;
+
+  --secondary: #1a2740;
+  --secondary-foreground: #f0e6d2;
+
+  --muted: #16203a;
+  --muted-foreground: #a09b8c;
+
+  --accent: #1f3050;
+  --accent-foreground: #f0e6d2;
+
+  --destructive: #c0392b;
+  --destructive-foreground: #f0e6d2;
+
+  --border: #785a28;
+  --input: #785a28;
+  --ring: #c8aa6e;
+
+  /* hextech extras used by status dots and the wordmark */
+  --gold: #c8aa6e;
+  --gold-bright: #f0d6a0;
+  --gold-deep: #785a28;
+  --hex-teal: #0596aa;
+  --hex-teal-light: #cdfafa;
+  --status-waiting: #6c7689;
+  --status-connected: #0596aa;
+  --status-active: #c8aa6e;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-deep: var(--gold-deep);
+  --color-hex-teal: var(--hex-teal);
+  --color-hex-teal-light: var(--hex-teal-light);
+  --color-status-waiting: var(--status-waiting);
+  --color-status-connected: var(--status-connected);
+  --color-status-active: var(--status-active);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-display: "Beaufort for LOL", "Cinzel", ui-serif, Georgia,
+    "Times New Roman", serif;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    color-scheme: dark;
+    margin: 0;
+    font-family: var(--font-sans);
+    /* the window is a fixed size panel, so the body itself never scrolls */
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+}
+
+@layer components {
+  /* ornate gold framed surface used by the teammate cards and panels */
+  .hex-frame {
+    border: 1px solid var(--gold-deep);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 28, 51, 0.92),
+      rgba(10, 20, 40, 0.92)
+    );
+  }
+
+  /* the small uppercase letter spaced label style used across the ui */
+  .hex-label {
+    font-family: var(--font-display);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+}
+
+/* on macos the window has a native frosted vibrancy behind it; a translucent
+   body lets the blur show through. enabled via the .vibrancy class set in
+   main.tsx, so windows and the browser preview stay fully opaque. */
+html.vibrancy body {
+  background-color: rgba(10, 20, 40, 0.75);
+}
+
+/* on macos the title-bar overlay puts the traffic lights in the top-left, so
+   the in-panel wordmark just clashes with them. hide it there and let the
+   status + gear group float to the right edge. the brand still shows on the
+   empty state and as the dock icon. */
+html.vibrancy header > div:first-child {
+  display: none;
+}
+html.vibrancy header {
+  justify-content: flex-end;
+}

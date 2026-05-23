@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "core permissions for the expose main window and tray. plugin work (store, opener) is driven from rust, so the frontend only needs core event and window access.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# frontend build output
+dist/
+
+# rust / tauri build output
+src-tauri/target/
+src-tauri/gen/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# claude code local tooling (preview launch config)
+.claude/
+
+# env
+.env
+.env.*
