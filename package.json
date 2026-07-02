@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "description": "League of Legends lobby companion: surface champ-select teammates, auto-accept queue pops, and dodge in one click",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

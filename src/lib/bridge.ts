@@ -8,6 +8,7 @@ import type {
   ChampionData,
   ChampSelectPhase,
   ConnectionStatus,
+  Notice,
   ScoutProvider,
   Settings,
   Teammate,
@@ -18,6 +19,7 @@ const EVENT_STATUS = "expose://status";
 const EVENT_TEAMMATES = "expose://teammates";
 const EVENT_PHASE = "expose://phase";
 const EVENT_UPDATE = "expose://update";
+const EVENT_NOTICE = "expose://notice";
 
 export const bridge = {
   getStatus: () => invoke<ConnectionStatus>("get_status"),
@@ -30,6 +32,7 @@ export const bridge = {
   setScoutProvider: (provider: ScoutProvider) =>
     invoke<void>("set_scout_provider", { provider }),
   setAutoOpen: (enabled: boolean) => invoke<void>("set_auto_open", { enabled }),
+  setRevealRanked: (enabled: boolean) => invoke<void>("set_reveal_ranked", { enabled }),
   setLaunchAtLogin: (enabled: boolean) => invoke<void>("set_launch_at_login", { enabled }),
   openScout: () => invoke<void>("open_scout"),
 
@@ -41,4 +44,6 @@ export const bridge = {
     listen<ChampSelectPhase>(EVENT_PHASE, (event) => handler(event.payload)),
   onUpdate: (handler: (info: UpdateInfo) => void): Promise<UnlistenFn> =>
     listen<UpdateInfo>(EVENT_UPDATE, (event) => handler(event.payload)),
+  onNotice: (handler: (notice: Notice) => void): Promise<UnlistenFn> =>
+    listen<Notice>(EVENT_NOTICE, (event) => handler(event.payload)),
 };

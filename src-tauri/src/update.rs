@@ -75,10 +75,17 @@ fn is_newer(latest: &str, current: &str) -> bool {
 // parses a "v1.2.3" or "1.2.3" tag into a comparable tuple.
 fn parse(version: &str) -> Option<(u32, u32, u32)> {
     let mut parts = version.trim().trim_start_matches('v').split('.');
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().unwrap_or("0").parse().ok()?;
-    let patch = parts.next().unwrap_or("0").parse().ok()?;
+    let major = segment(parts.next())?;
+    let minor = segment(parts.next().or(Some("0")))?;
+    let patch = segment(parts.next().or(Some("0")))?;
     Some((major, minor, patch))
+}
+
+// reads one version segment, tolerating a trailing pre-release or build suffix
+// such as "3-rc1" or "3+build.2" by taking only the leading digits.
+fn segment(part: Option<&str>) -> Option<u32> {
+    let digits: String = part?.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
 }
 
 #[cfg(test)]
@@ -102,5 +109,13 @@ mod tests {
     fn malformed_versions_are_not_newer() {
         assert!(!is_newer("nightly", "0.1.0"));
         assert!(!is_newer("v0.1.0", "garbage"));
+    }
+
+    #[test]
+    fn tolerates_prerelease_and_build_suffixes() {
+        assert!(is_newer("v0.2.0-rc1", "0.1.0"));
+        assert!(is_newer("1.2.3+build.5", "1.2.2"));
+        // a prerelease of the current version is not treated as newer.
+        assert!(!is_newer("v0.1.0-rc1", "0.1.0"));
     }
 }

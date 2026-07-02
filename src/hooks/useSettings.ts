@@ -4,9 +4,9 @@ import { bridge } from "@/lib/bridge";
 import type { ScoutProvider, Settings } from "@/types";
 
 const DEFAULTS: Settings = {
-  autoAccept: false,
   scoutProvider: "opgg",
   autoOpen: false,
+  revealRanked: true,
   launchAtLogin: false,
 };
 
@@ -28,10 +28,15 @@ export function useSettings() {
     bridge.setAutoOpen(enabled).catch(() => {});
   }, []);
 
+  const setRevealRanked = useCallback((enabled: boolean) => {
+    setSettings((prev) => ({ ...prev, revealRanked: enabled }));
+    bridge.setRevealRanked(enabled).catch(() => {});
+  }, []);
+
   const setLaunchAtLogin = useCallback((enabled: boolean) => {
     setSettings((prev) => ({ ...prev, launchAtLogin: enabled }));
     bridge.setLaunchAtLogin(enabled).catch(() => {});
   }, []);
 
-  return { settings, setScoutProvider, setAutoOpen, setLaunchAtLogin };
+  return { settings, setScoutProvider, setAutoOpen, setRevealRanked, setLaunchAtLogin };
 }

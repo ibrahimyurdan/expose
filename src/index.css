@@ -26,12 +26,15 @@
   --secondary-foreground: #f0e6d2;
 
   --muted: #16203a;
-  --muted-foreground: #a09b8c;
+  /* lifted from #a09b8c (4.4:1, fails AA at the 11px sizes used everywhere) to
+     ~5.6:1 while staying clearly subordinate to the parchment foreground. */
+  --muted-foreground: #b3ada0;
 
   --accent: #1f3050;
   --accent-foreground: #f0e6d2;
 
-  --destructive: #c0392b;
+  /* a brighter alarm red so the confirm-dodge state reads urgent, not brick. */
+  --destructive: #e0473b;
   --destructive-foreground: #f0e6d2;
 
   --border: #785a28;
@@ -124,11 +127,36 @@
     );
   }
 
-  /* the small uppercase letter spaced label style used across the ui */
+  /* the small uppercase letter spaced label style used across the ui. the
+     weight gives the serif fallback presence; 0.14em keeps 11px caps from
+     clipping their last glyph the way 0.18em could. */
   .hex-label {
     font-family: var(--font-display);
-    letter-spacing: 0.18em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
+  }
+
+  /* drains a bar left-to-right over the dodge auto-disarm window so the safety
+     timer is visible instead of silent. */
+  @keyframes dodge-drain {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+}
+
+/* respect the os reduced-motion setting now that pulse/spin/drain are in play. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

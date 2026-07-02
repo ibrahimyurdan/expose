@@ -147,6 +147,23 @@ pub struct ChampSelectPhase {
     pub time_left_ms: i64,
 }
 
+// a transient message surfaced to the user as a toast. used so failures that
+// were previously only logged to stderr (a failed dodge, an unreachable riot
+// client) actually reach the person using the app.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoticeLevel {
+    Info,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Notice {
+    pub level: NoticeLevel,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Teammate {
@@ -159,7 +176,10 @@ pub struct Teammate {
     pub assigned_position: String,
     pub champion_id: i64,
     pub champion_pick_intent: i64,
-    pub opgg_url: String,
+    // single-summoner profile link on the chosen scout site, plus the site's
+    // label for the row button. rebuilt when the scout provider changes.
+    pub scout_url: String,
+    pub scout_label: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

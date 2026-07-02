@@ -8,13 +8,23 @@ a small companion for the league of legends client. it does three things:
 
 on macos it lives in the dock; on windows in the notification area. no account login and no in-game overlay.
 
+## risk & terms of use
+
+expose talks to riot's local **lcu** and **riot client** apis. these are unofficial and unsupported — riot can change or remove them at any time, and using them is not endorsed.
+
+the ranked teammates feature is the part to weigh. anonymous champ select hides teammate names on purpose; expose recovers them from a separate local api that still reports them, so it defeats a deliberate riot feature. that is a stronger terms-of-use concern than auto-accept or dodge and may carry some account risk. it is on by default and can be turned off under settings → **reveal in ranked**. auto-accept and dodge are ordinary client conveniences, but are still automation of client actions.
+
+there is no way to know riot's enforcement intent for certain. **use expose at your own risk.**
+
 ## features in detail
 
 **teammates.** in normal, draft, and bot games the champ-select session carries real puuids, so expose shows a full card per teammate: role, current champion, level, and a region-correct op.gg link. in ranked, riot's anonymous champ select strips identities from that session, so expose instead reads the riot client chat service (a separate local api that still knows who is who) and surfaces each teammate's name and op.gg link — names only, because the chat gives no way to map a name back to a champ-select cell (so no role or champion). enemy identities are never available (riot zeroes them) and are out of scope. a **scout all** button opens every teammate on op.gg at once via a multi-search.
 
 **auto-accept.** when a ready check pops and the toggle is on, expose accepts it. the toggle state is saved between launches.
 
-**dodge.** a dodge button appears during champ select. it takes two clicks (arm, then confirm) so it can't fire by accident, and leaves champ select through the client api without closing the client. the normal dodge penalty (lp loss, queue lockout) still applies; expose only saves you the force-quit.
+**dodge.** a dodge button appears during champ select. it takes two clicks (arm, then confirm, with a visible 3 second disarm timer) so it can't fire by accident, and leaves champ select through the client api without closing the client. the normal dodge penalty (lp loss, queue lockout) still applies; expose only saves you the force-quit.
+
+**settings.** a gear in the header opens settings: pick the scout site (op.gg, u.gg, deeplol, or tracker), auto-open the scout multi-search when champ select begins, toggle reveal-in-ranked, and launch expose at login. failures (an unreachable riot client, a dodge that could not fire) surface as a brief in-app notice rather than failing silently.
 
 see [scope](#scope) below for what is intentionally left out.
 
@@ -37,7 +47,7 @@ after launch, expose lives in the tray. left click the tray icon to show or hide
 prerequisites:
 
 - rust (stable) and cargo
-- node 20 or newer and npm
+- node 22 (or 20.19+) and npm
 - the platform tauri prerequisites: xcode command line tools on macos, the webview2 runtime and the msvc build tools on windows. see the tauri prerequisites guide for details.
 
 then:
@@ -85,12 +95,14 @@ src-tauri/src/
   state.rs           shared state (toggle, caches, status)
   commands.rs        frontend commands (status, toggle, dodge, open links)
   ddragon.rs         champion id to name and icon lookup
+  scout.rs           multi-search url builder per scout site
+  update.rs          github release version check
   tray.rs            windows notification-area icon (macos uses the dock)
   lcu/
     auth.rs          credential discovery for the league + riot clients
     client.rs        https client (league client and riot client chat)
     websocket.rs     event subscription and parsing
-    mod.rs           connection supervisor
+    mod.rs           connection supervisor (poll, heartbeat, reconnect)
   features/
     teammates.rs     resolve teammates (session, or riot chat when hidden)
     auto_accept.rs   accept ready checks

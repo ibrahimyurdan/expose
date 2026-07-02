@@ -32,10 +32,17 @@ pub struct AppState {
     // the most recently resolved team, so the scout command can build a
     // multi-search link from the backend.
     pub teammates: RwLock<Vec<Teammate>>,
-    // chosen scout site ("opgg", "ugg", "deeplol", "tracker"); empty == opgg.
+    // chosen scout site ("opgg" or "ugg"); empty or unknown is treated as opgg.
     pub scout_provider: RwLock<String>,
     // open the scout link automatically when champ select begins.
     pub auto_open: AtomicBool,
     // guards auto-open so it fires once per champ select, not on every update.
     pub auto_opened: AtomicBool,
+    // reveal teammate names in anonymous ranked champ select. the baseline is
+    // set to true at startup (the default is restored/overridden from the store)
+    // so the headline feature works out of the box but can be turned off.
+    pub reveal_ranked: AtomicBool,
+    // guards the once-per-champ-select resolution notice (no riot client, reveal
+    // disabled, chat read failed) so it does not toast on every session update.
+    pub notified: AtomicBool,
 }

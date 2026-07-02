@@ -12,19 +12,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
 
   backend:
-    # runs on macos so the tauri crate compiles without extra system libraries.
-    runs-on: macos-latest
+    # compile and test on both shipped platforms so a windows-only break (the
+    # tray module, autostart, aws-lc-rs) is caught here rather than at release.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      # aws-lc-rs (pulled in by rustls) assembles with nasm on windows.
+      - name: install nasm
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/setup-nasm@v1
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"

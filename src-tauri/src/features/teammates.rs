@@ -13,7 +13,9 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::features::{set_status, EVENT_PHASE, EVENT_TEAMMATES};
 use crate::lcu::client::LcuClient;
-use crate::models::{ChampSelectPhase, ChampSelectSession, ConnectionStatus, Teammate};
+use crate::models::{
+    ChampSelectPhase, ChampSelectSession, ConnectionStatus, NoticeLevel, Teammate,
+};
 use crate::state::AppState;
 
 pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &str, data: Value) {
@@ -33,14 +35,23 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
         return;
     };
 
+    // a transitional create/update can arrive with an empty team and no phase
+    // before champ select is really underway. ignore it so the window does not
+    // pop forward on an empty session.
+    if session.my_team.is_empty() && session.timer.phase.is_empty() {
+        return;
+    }
+
     // only pop the window forward on the transition into champ select, not on
     // every subsequent session update, so it does not repeatedly steal focus.
     let entering = *state.status.read() != ConnectionStatus::ChampSelect;
     set_status(app, ConnectionStatus::ChampSelect);
     if entering {
         show_window(app);
-        // a fresh champ select: allow auto-open to fire once more.
+        // a fresh champ select: allow auto-open and the resolution notice to
+        // fire once more.
         state.auto_opened.store(false, Ordering::Relaxed);
+        state.notified.store(false, Ordering::Relaxed);
     }
 
     let _ = app.emit(
@@ -58,7 +69,16 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
     let region = state.region.read().clone();
 
     let mut teammates = if hidden {
-        resolve_from_chat(app, client, region.as_deref()).await
+        if state.reveal_ranked.load(Ordering::Relaxed) {
+            resolve_from_chat(app, client, region.as_deref()).await
+        } else {
+            notify_once(
+                app,
+                NoticeLevel::Info,
+                "ranked reveal is off — turn it on in settings to see hidden teammates",
+            );
+            Vec::new()
+        }
     } else {
         resolve_from_session(app, client, &session, region.as_deref()).await
     };
@@ -106,6 +126,8 @@ async fn resolve_from_session(
     region: Option<&str>,
 ) -> Vec<Teammate> {
     let state = app.state::<AppState>();
+    let provider = state.scout_provider.read().clone();
+    let label = crate::scout::provider_label(&provider).to_string();
     let mut teammates = Vec::new();
     for player in &session.my_team {
         if is_hidden_puuid(&player.puuid) {
@@ -137,7 +159,13 @@ async fn resolve_from_session(
         teammates.push(Teammate {
             cell_id: player.cell_id,
             puuid: player.puuid.clone(),
-            opgg_url: build_opgg_url(region, &summoner.game_name, &summoner.tag_line),
+            scout_url: crate::scout::profile_url(
+                &provider,
+                region,
+                &summoner.game_name,
+                &summoner.tag_line,
+            ),
+            scout_label: label.clone(),
             game_name: summoner.game_name,
             tag_line: summoner.tag_line,
             summoner_level: summoner.summoner_level,
@@ -163,6 +191,11 @@ async fn resolve_from_chat(
     let riot = state.riot_client.read().clone();
     let Some(riot) = riot else {
         eprintln!("expose: anonymous champ select but no riot client available");
+        notify_once(
+            app,
+            NoticeLevel::Error,
+            "couldn't read teammate names — make sure the Riot client is running",
+        );
         return Vec::new();
     };
 
@@ -170,13 +203,28 @@ async fn resolve_from_chat(
         Ok(participants) => participants,
         Err(error) => {
             eprintln!("expose: could not read chat participants: {error}");
+            notify_once(
+                app,
+                NoticeLevel::Error,
+                "couldn't read teammate names from the Riot client",
+            );
             return Vec::new();
         }
     };
 
+    let provider = state.scout_provider.read().clone();
+    let label = crate::scout::provider_label(&provider).to_string();
     let mut teammates = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     for participant in participants {
         if !participant.cid.contains("champ-select") || participant.game_name.is_empty() {
+            continue;
+        }
+
+        // the chat reports participants across conversations, so the same person
+        // can appear more than once. de-duplicate by puuid to avoid doubled rows
+        // and colliding react keys in the ui.
+        if !participant.puuid.is_empty() && !seen.insert(participant.puuid.clone()) {
             continue;
         }
 
@@ -203,7 +251,13 @@ async fn resolve_from_chat(
 
         teammates.push(Teammate {
             cell_id: 0,
-            opgg_url: build_opgg_url(region, &participant.game_name, &participant.game_tag),
+            scout_url: crate::scout::profile_url(
+                &provider,
+                region,
+                &participant.game_name,
+                &participant.game_tag,
+            ),
+            scout_label: label.clone(),
             puuid: participant.puuid,
             game_name: participant.game_name,
             tag_line: participant.game_tag,
@@ -223,31 +277,13 @@ fn is_hidden_puuid(puuid: &str) -> bool {
     puuid.is_empty() || puuid.chars().all(|c| c == '0' || c == '-')
 }
 
-// builds a region-correct op.gg account link. region is the op.gg web slug, for
-// example "na" or "euw"; it falls back to "na" only if the client did not
-// report one.
-fn build_opgg_url(region: Option<&str>, game_name: &str, tag_line: &str) -> String {
-    let region = region.filter(|slug| !slug.is_empty()).unwrap_or("na");
-    format!(
-        "https://www.op.gg/summoners/{region}/{}-{}",
-        percent_encode(game_name),
-        percent_encode(tag_line)
-    )
-}
-
-// percent-encodes a single url path segment so riot ids with spaces or other
-// characters produce a valid link.
-fn percent_encode(segment: &str) -> String {
-    let mut encoded = String::with_capacity(segment.len());
-    for byte in segment.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(byte as char);
-            }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
-        }
+// emits a resolution notice at most once per champ select, so a missing riot
+// client or a disabled reveal does not toast on every session update.
+fn notify_once(app: &AppHandle, level: NoticeLevel, message: &str) {
+    let state = app.state::<AppState>();
+    if !state.notified.swap(true, Ordering::Relaxed) {
+        crate::features::notice(app, level, message);
     }
-    encoded
 }
 
 fn show_window(app: &AppHandle) {
@@ -266,30 +302,6 @@ fn hide_window(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn builds_a_region_correct_opgg_url() {
-        assert_eq!(
-            build_opgg_url(Some("euw"), "Faker", "KR1"),
-            "https://www.op.gg/summoners/euw/Faker-KR1"
-        );
-    }
-
-    #[test]
-    fn falls_back_to_na_when_the_region_is_unknown() {
-        assert!(build_opgg_url(None, "Name", "NA1").starts_with("https://www.op.gg/summoners/na/"));
-        assert!(
-            build_opgg_url(Some(""), "Name", "NA1").starts_with("https://www.op.gg/summoners/na/")
-        );
-    }
-
-    #[test]
-    fn percent_encodes_spaces_and_special_characters() {
-        assert_eq!(
-            build_opgg_url(Some("na"), "Hide on bush", "NA 1"),
-            "https://www.op.gg/summoners/na/Hide%20on%20bush-NA%201"
-        );
-    }
 
     #[test]
     fn recognizes_hidden_or_zeroed_puuids() {

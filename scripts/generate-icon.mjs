@@ -2,12 +2,20 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import path from "node:path";
 
-// generates a placeholder hextech app icon: a gold diamond ring on deep navy.
-// it has no external dependencies so the project can be built from a clean
-// checkout. to ship custom art, replace src-tauri/icons/source.png and rerun
+// generates a placeholder hextech app icon: a gold diamond ring on deep navy,
+// set on the macos rounded-rectangle ("squircle") grid so it sits the same size
+// and shape as other dock icons instead of a sharp full-bleed square. it has no
+// external dependencies so the project can be built from a clean checkout. to
+// ship custom art, replace src-tauri/icons/source.png and rerun
 // `npm run tauri icon src-tauri/icons/source.png`.
 
 const SIZE = 1024;
+
+// macos icon grid: the rounded body is 824x824 centered on the 1024 canvas
+// (~100px transparent margin each side) with a corner radius of ~185px. the
+// transparent margin is what makes it match the size of other apps' icons.
+const CONTENT_HALF = 412; // half of the 824px body
+const CORNER_RADIUS = 185;
 
 const NAVY = [10, 20, 40];
 const GOLD = [200, 170, 110];
@@ -17,15 +25,36 @@ function lerp(a, b, t) {
   return Math.round(a + (b - a) * t);
 }
 
-const pixels = Buffer.alloc(SIZE * SIZE * 4);
+// signed distance to a rounded rectangle centered at the origin; <= 0 inside.
+// used to round the corners and anti-alias the outer edge to transparency.
+function roundedRectSdf(px, py, half, r) {
+  const qx = Math.abs(px) - (half - r);
+  const qy = Math.abs(py) - (half - r);
+  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
+  return Math.min(Math.max(qx, qy), 0) + outside - r;
+}
+
+const pixels = Buffer.alloc(SIZE * SIZE * 4); // zero-filled => transparent
 const cx = SIZE / 2;
 const cy = SIZE / 2;
-const radius = SIZE * 0.42;
+// scale the diamond to the rounded body, leaving breathing room inside it.
+const radius = CONTENT_HALF * 0.8;
 
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
-    // manhattan distance from the center traces a diamond shape
-    const d = (Math.abs(x - cx) + Math.abs(y - cy)) / radius;
+    const dx = x - cx;
+    const dy = y - cy;
+
+    // coverage of the rounded-rect mask: 1 inside, 0 outside, ~1px soft edge.
+    const sdf = roundedRectSdf(dx, dy, CONTENT_HALF, CORNER_RADIUS);
+    const coverage = Math.min(Math.max(0.5 - sdf, 0), 1);
+    const i = (y * SIZE + x) * 4;
+    if (coverage <= 0) {
+      continue; // leave fully transparent
+    }
+
+    // manhattan distance from the center traces the diamond.
+    const d = (Math.abs(dx) + Math.abs(dy)) / radius;
     let color;
     if (d <= 0.46) {
       color = GOLD;
@@ -41,11 +70,11 @@ for (let y = 0; y < SIZE; y++) {
     } else {
       color = NAVY;
     }
-    const i = (y * SIZE + x) * 4;
+
     pixels[i] = color[0];
     pixels[i + 1] = color[1];
     pixels[i + 2] = color[2];
-    pixels[i + 3] = 255;
+    pixels[i + 3] = Math.round(255 * coverage);
   }
 }
 

@@ -24,3 +24,7 @@ npm-debug.log*
 # env
 .env
 .env.*
+
+# unused mobile icon output from `tauri icon` (this app is macos + windows only)
+src-tauri/icons/android/
+src-tauri/icons/ios/

@@ -18,7 +18,7 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager, WindowEvent};
 use tauri_plugin_store::StoreExt;
 
-use commands::{AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, SCOUT_PROVIDER_KEY, STORE_FILE};
+use commands::{AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, REVEAL_RANKED_KEY, SCOUT_PROVIDER_KEY, STORE_FILE};
 use state::AppState;
 
 fn main() {
@@ -45,6 +45,7 @@ fn main() {
             commands::get_settings,
             commands::set_scout_provider,
             commands::set_auto_open,
+            commands::set_reveal_ranked,
             commands::set_launch_at_login,
             commands::open_scout,
         ])
@@ -61,6 +62,13 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
+            // reveal-in-ranked defaults on so the headline feature works out of
+            // the box; the persisted store can override it to off below.
+            handle
+                .state::<AppState>()
+                .reveal_ranked
+                .store(true, Ordering::Relaxed);
+
             // restore persisted settings.
             if let Ok(store) = handle.store(STORE_FILE) {
                 let state = handle.state::<AppState>();
@@ -70,6 +78,12 @@ fn main() {
                 }
                 if let Some(enabled) = store.get(AUTO_OPEN_KEY).and_then(|value| value.as_bool()) {
                     state.auto_open.store(enabled, Ordering::Relaxed);
+                }
+                if let Some(enabled) = store
+                    .get(REVEAL_RANKED_KEY)
+                    .and_then(|value| value.as_bool())
+                {
+                    state.reveal_ranked.store(enabled, Ordering::Relaxed);
                 }
                 if let Some(provider) = store
                     .get(SCOUT_PROVIDER_KEY)

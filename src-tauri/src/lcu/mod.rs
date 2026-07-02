@@ -24,9 +24,15 @@ use websocket::{LcuEvent, WsStream, CHAMP_SELECT_EVENT, READY_CHECK_EVENT};
 // us sooner than this when the lockfile appears, so this is just the ceiling.
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 
+// how often we ping the event socket, and how long we tolerate hearing nothing
+// back before forcing a reconnect. this catches a silently half-open socket (a
+// client crash, sleep/resume) that would otherwise wedge the read loop forever.
+const PING_INTERVAL: Duration = Duration::from_secs(30);
+const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+
 // credentials for one running league client session. the port is random per
 // launch and the token authenticates every http and websocket request.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Credentials {
     pub port: u16,
     pub token: String,
@@ -34,6 +40,22 @@ pub struct Credentials {
     // optional because a custom install might only yield the league lockfile.
     pub riot_port: Option<u16>,
     pub riot_token: Option<String>,
+}
+
+// redact the tokens so a stray {:?} can never leak the powerful lcu credential
+// into logs, undoing the set_sensitive handling elsewhere.
+impl std::fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credentials")
+            .field("port", &self.port)
+            .field("token", &"<redacted>")
+            .field("riot_port", &self.riot_port)
+            .field(
+                "riot_token",
+                &self.riot_token.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 // the connection supervisor. it owns the full lifecycle: detect the client,
@@ -47,7 +69,14 @@ pub async fn supervise(app: AppHandle) {
     };
 
     loop {
-        let Some(credentials) = auth::find_credentials() else {
+        // credential discovery scans the full process table and reads lockfiles,
+        // both blocking; run it off the async runtime so it cannot stall other
+        // tasks during a reconnect storm.
+        let credentials = tokio::task::spawn_blocking(auth::find_credentials)
+            .await
+            .ok()
+            .flatten();
+        let Some(credentials) = credentials else {
             wait_for_next_attempt(&mut wake).await;
             continue;
         };
@@ -100,22 +129,45 @@ async fn run_session(app: &AppHandle, credentials: &Credentials) -> Result<()> {
 }
 
 async fn read_loop(app: &AppHandle, client: &LcuClient, mut stream: WsStream) {
-    while let Some(message) = stream.next().await {
-        match message {
-            Ok(Message::Text(text)) => {
-                if let Some(event) = websocket::parse_event(text.as_str()) {
-                    dispatch(app, client, event).await;
+    let mut ping = tokio::time::interval(PING_INTERVAL);
+    // interval's first tick is immediate; consume it so we do not ping on connect.
+    ping.tick().await;
+    let mut last_seen = tokio::time::Instant::now();
+
+    loop {
+        tokio::select! {
+            message = stream.next() => {
+                let Some(message) = message else { break };
+                last_seen = tokio::time::Instant::now();
+                match message {
+                    Ok(Message::Text(text)) => {
+                        if let Some(event) = websocket::parse_event(text.as_str()) {
+                            dispatch(app, client, event).await;
+                        }
+                    }
+                    // answer keepalive pings so the client does not drop us.
+                    Ok(Message::Ping(payload)) => {
+                        let _ = stream.send(Message::Pong(payload)).await;
+                    }
+                    Ok(Message::Close(_)) => break,
+                    Ok(_) => {}
+                    Err(error) => {
+                        eprintln!("expose: websocket read error: {error}");
+                        break;
+                    }
                 }
             }
-            // answer keepalive pings so the client does not drop us.
-            Ok(Message::Ping(payload)) => {
-                let _ = stream.send(Message::Pong(payload)).await;
-            }
-            Ok(Message::Close(_)) => break,
-            Ok(_) => {}
-            Err(error) => {
-                eprintln!("expose: websocket read error: {error}");
-                break;
+            // ping on a timer; if nothing has arrived for the whole idle window
+            // (a silently half-open socket) force a reconnect rather than block
+            // on next() forever.
+            _ = ping.tick() => {
+                if last_seen.elapsed() >= IDLE_TIMEOUT {
+                    eprintln!("expose: lcu websocket idle, reconnecting");
+                    break;
+                }
+                if stream.send(Message::Ping(Default::default())).await.is_err() {
+                    break;
+                }
             }
         }
     }
@@ -158,9 +210,18 @@ fn spawn_lockfile_watcher() -> Option<(RecommendedWatcher, Receiver<()>)> {
     }
     let (tx, rx) = tokio::sync::mpsc::channel::<()>(8);
     let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
-        if result.is_ok() {
-            // a full queue already means a wake is pending, so dropping is fine.
-            let _ = tx.try_send(());
+        // only react to events that touch the lockfile itself; the client writes
+        // logs and configs to this directory constantly and we must not hot-spin
+        // the reconnect poll on every one of those.
+        if let Ok(event) = result {
+            let touches_lockfile = event
+                .paths
+                .iter()
+                .any(|path| path.file_name().is_some_and(|name| name == "lockfile"));
+            if touches_lockfile {
+                // a full queue already means a wake is pending, so dropping is fine.
+                let _ = tx.try_send(());
+            }
         }
     })
     .ok()?;

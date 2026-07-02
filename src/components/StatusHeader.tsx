@@ -35,13 +35,9 @@ export function StatusHeader({
   onToggleSettings: () => void;
 }) {
   const meta = STATUS_META[status];
-  const label =
-    status === "champSelect" && clock
-      ? `${PHASE_LABELS[clock.phase] ?? "Champ select"} · ${formatClock(clock.remainingMs)}`
-      : meta.label;
 
   return (
-    <header className="flex items-center justify-between px-4 py-3">
+    <header className="flex items-center justify-between px-3.5 py-3">
       <div className="flex items-center gap-2">
         <span className="text-base leading-none text-gold" aria-hidden>
           ◆
@@ -61,17 +57,40 @@ export function StatusHeader({
               )}
               aria-hidden
             />
-            <span className="hex-label text-[11px] text-muted-foreground">{label}</span>
+            <span
+              role="status"
+              aria-live="polite"
+              className={cn(
+                "hex-label text-[11px]",
+                status === "champSelect" ? "text-gold" : "text-muted-foreground",
+              )}
+            >
+              {status === "champSelect" && clock ? (
+                <>
+                  {PHASE_LABELS[clock.phase] ?? "Champ select"}
+                  {" · "}
+                  <span aria-hidden className="font-semibold tabular-nums text-foreground">
+                    {formatClock(clock.remainingMs)}
+                  </span>
+                </>
+              ) : (
+                meta.label
+              )}
+            </span>
           </>
         )}
         <button
           type="button"
           onClick={onToggleSettings}
-          className="text-muted-foreground transition-colors hover:text-gold"
+          className="-m-1.5 ml-1 inline-flex items-center justify-center rounded-sm p-1.5 text-muted-foreground transition-[color,transform] hover:rotate-90 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label={settingsOpen ? "Close settings" : "Open settings"}
           title="Settings"
         >
-          {settingsOpen ? <X className="h-4 w-4" /> : <SettingsIcon className="h-4 w-4" />}
+          {settingsOpen ? (
+            <X className="h-4 w-4" aria-hidden />
+          ) : (
+            <SettingsIcon className="h-4 w-4" aria-hidden />
+          )}
         </button>
       </div>
     </header>
