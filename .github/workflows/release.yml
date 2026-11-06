@@ -104,3 +104,28 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  publish:
+    # both builds upload into one hidden draft, since two jobs creating a public
+    # release at once could make two. once every installer is attached, the
+    # draft goes public so the downloads work without a github account. if a
+    # build failed this is skipped and the release stays a draft. a tag with a
+    # suffix, like v0.2.0-beta.1, goes out as a pre-release.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: make the release public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prerelease=false
+          case "$GITHUB_REF_NAME" in *-*) prerelease=true ;; esac
+          # a draft cannot be looked up by its tag, so find it in the list.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id" | head -n 1)
+          if [ -z "$id" ]; then
+            echo "no release found for $GITHUB_REF_NAME"
+            exit 1
+          fi
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" \
+            -F draft=false -F prerelease="$prerelease" --jq '.html_url'
