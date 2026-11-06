@@ -21,6 +21,10 @@ use tauri_plugin_store::StoreExt;
 use commands::{AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, REVEAL_RANKED_KEY, SCOUT_PROVIDER_KEY, STORE_FILE};
 use state::AppState;
 
+// passed by the os when it starts expose at login, so a login start can stay
+// quietly in the tray while a normal launch opens the window.
+const AUTOSTART_FLAG: &str = "--autostart";
+
 fn main() {
     let app = tauri::Builder::default()
         // single instance must be registered first: a second launch is
@@ -32,7 +36,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_FLAG]),
         ))
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
@@ -48,6 +52,7 @@ fn main() {
             commands::set_reveal_ranked,
             commands::set_launch_at_login,
             commands::open_scout,
+            commands::get_update,
         ])
         .on_window_event(|window, event| {
             // closing the window keeps expose running and just hides it; it is
@@ -61,6 +66,12 @@ fn main() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            start_logging(&handle);
+            log::info!(
+                "expose {} starting on {}",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS
+            );
 
             // reveal-in-ranked defaults on so the headline feature works out of
             // the box; the persisted store can override it to off below.
@@ -93,13 +104,24 @@ fn main() {
                 }
             }
 
-            // windows lives in the notification area, kept off the taskbar.
+            // windows lives in the notification area, kept off the taskbar (see
+            // reveal_main_window).
             #[cfg(target_os = "windows")]
             {
                 if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window.set_skip_taskbar(true);
+                    // a dark title bar to match the panel even in light mode.
+                    let _ = window.set_theme(Some(tauri::Theme::Dark));
+                    // with no taskbar button a minimized window has nowhere to
+                    // go, so the title bar only offers close (which hides it).
+                    let _ = window.set_minimizable(false);
+                    let _ = window.set_maximizable(false);
                 }
                 tray::build(&handle)?;
+                // new tray icons often land in the hidden overflow area, so a
+                // normal launch opens the window to show expose is running.
+                if !std::env::args().any(|arg| arg == AUTOSTART_FLAG) {
+                    show_main_window(&handle);
+                }
             }
 
             // macos: a frosted-glass window, a dock icon, and open on launch.
@@ -140,9 +162,46 @@ fn main() {
     }
 }
 
+// a windows release build has no console, so diagnostics go to a log file:
+// %LOCALAPPDATA%\io.github.ibrahimyurdan.expose\logs\Expose.log on windows and
+// ~/Library/Logs/io.github.ibrahimyurdan.expose/Expose.log on macos. the logger
+// is attached by hand rather than as a plugin, so a log file that cannot be
+// opened (held by another program, say) costs only the log, not the startup.
+fn start_logging(app: &AppHandle) {
+    let builder = tauri_plugin_log::Builder::new()
+        .level(log::LevelFilter::Info)
+        // keep the previous file when rotating, so the start of a session
+        // survives a noisy one.
+        .max_file_size(1_000_000)
+        .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(2));
+    match builder.split(app) {
+        Ok((_plugin, level, logger)) => {
+            if let Err(error) = tauri_plugin_log::attach_logger(level, logger) {
+                eprintln!("expose: could not attach the logger: {error}");
+            }
+        }
+        Err(error) => eprintln!("expose: logging is off, could not open the log file: {error}"),
+    }
+}
+
 fn show_main_window(app: &AppHandle) {
+    reveal_main_window(app, true);
+}
+
+// shows the panel, bringing it back if it was minimized. focus is optional so
+// the champ-select pop can leave the keyboard with the league client.
+fn reveal_main_window(app: &AppHandle, focus: bool) {
     if let Some(window) = app.get_webview_window("main") {
+        if window.is_minimized().unwrap_or(false) {
+            let _ = window.unminimize();
+        }
         let _ = window.show();
-        let _ = window.set_focus();
+        // windows gives a window its taskbar button back every time it is
+        // shown, so the skip has to be reapplied after each show.
+        #[cfg(target_os = "windows")]
+        let _ = window.set_skip_taskbar(true);
+        if focus {
+            let _ = window.set_focus();
+        }
     }
 }

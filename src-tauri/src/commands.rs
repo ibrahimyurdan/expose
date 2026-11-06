@@ -12,6 +12,7 @@ use tauri_plugin_store::StoreExt;
 use crate::models::{ChampionData, ConnectionStatus};
 use crate::scout;
 use crate::state::AppState;
+use crate::update::UpdateInfo;
 
 pub const STORE_FILE: &str = "settings.json";
 pub const AUTO_ACCEPT_KEY: &str = "autoAccept";
@@ -45,7 +46,7 @@ pub fn set_auto_accept(app: AppHandle, state: State<AppState>, enabled: bool) {
     if let Ok(store) = app.store(STORE_FILE) {
         store.set(AUTO_ACCEPT_KEY, enabled);
         if let Err(error) = store.save() {
-            eprintln!("expose: could not persist settings: {error}");
+            log::warn!("could not persist settings: {error}");
         }
     }
 }
@@ -53,6 +54,12 @@ pub fn set_auto_accept(app: AppHandle, state: State<AppState>, enabled: bool) {
 #[tauri::command]
 pub fn get_champions(state: State<AppState>) -> Option<ChampionData> {
     state.champions.read().clone()
+}
+
+// the startup update check, or none while it is still running.
+#[tauri::command]
+pub fn get_update(state: State<AppState>) -> Option<UpdateInfo> {
+    state.update.read().clone()
 }
 
 // opens a link (the op.gg button) in the system browser. routing this through a
@@ -64,7 +71,7 @@ pub fn open_external(app: AppHandle, url: String) {
         return;
     }
     if let Err(error) = app.opener().open_url(url, None::<&str>) {
-        eprintln!("expose: could not open external url: {error}");
+        log::warn!("could not open external url: {error}");
     }
 }
 
@@ -164,7 +171,7 @@ pub fn open_scout(app: AppHandle, state: State<AppState>) {
     let region = state.region.read().clone();
     if let Some(url) = scout::scout_url(&provider, &teammates, region.as_deref()) {
         if let Err(error) = app.opener().open_url(url, None::<&str>) {
-            eprintln!("expose: could not open scout url: {error}");
+            log::warn!("could not open scout url: {error}");
         }
     }
 }

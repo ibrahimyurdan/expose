@@ -14,16 +14,27 @@ use crate::state::AppState;
 
 const VERSIONS_URL: &str = "https://ddragon.leagueoflegends.com/api/versions.json";
 
-// loads champion data into shared state. a failure is logged and left for the
-// frontend to retry; it never blocks startup.
+// a launch at sign in can beat the network, so failed loads are retried, waiting
+// a little longer each time up to this ceiling.
+const RETRY_FIRST: Duration = Duration::from_secs(15);
+const RETRY_MAX: Duration = Duration::from_secs(600);
+
+// loads champion data into shared state, retrying until it succeeds. it runs in
+// the background and never blocks startup.
 pub async fn load(app: AppHandle) {
-    match fetch().await {
-        Ok(data) => {
-            *app.state::<AppState>().champions.write() = Some(data);
+    let mut wait = RETRY_FIRST;
+    loop {
+        match fetch().await {
+            Ok(data) => {
+                *app.state::<AppState>().champions.write() = Some(data);
+                return;
+            }
+            Err(error) => {
+                log::warn!("could not load champion data, retrying in {wait:?}: {error}");
+            }
         }
-        Err(error) => {
-            eprintln!("expose: could not load champion data: {error}");
-        }
+        tokio::time::sleep(wait).await;
+        wait = (wait * 2).min(RETRY_MAX);
     }
 }
 

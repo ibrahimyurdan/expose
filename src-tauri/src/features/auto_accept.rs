@@ -26,7 +26,7 @@ pub async fn handle_ready_check(app: &AppHandle, client: &LcuClient, data: Value
     let enabled = app.state::<AppState>().auto_accept.load(Ordering::Relaxed);
     if should_accept(&check, enabled) {
         if let Err(error) = client.accept_ready_check().await {
-            eprintln!("expose: failed to accept the ready check: {error}");
+            log::warn!("failed to accept the ready check: {error}");
         }
     }
 }

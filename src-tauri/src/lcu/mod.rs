@@ -81,8 +81,9 @@ pub async fn supervise(app: AppHandle) {
             continue;
         };
 
-        if let Err(error) = run_session(&app, &credentials).await {
-            eprintln!("expose: lcu session ended: {error}");
+        match run_session(&app, &credentials).await {
+            Ok(()) => log::info!("league client disconnected"),
+            Err(error) => log::warn!("lcu session ended: {error}"),
         }
 
         // the client went away or the socket dropped: reset to waiting.
@@ -98,6 +99,15 @@ pub async fn supervise(app: AppHandle) {
 }
 
 async fn run_session(app: &AppHandle, credentials: &Credentials) -> Result<()> {
+    log::info!(
+        "found the league client on port {} (riot client {})",
+        credentials.port,
+        if credentials.riot_port.is_some() {
+            "found too"
+        } else {
+            "not found"
+        }
+    );
     let client = LcuClient::from_parts(credentials.port, &credentials.token)?;
     let state = app.state::<AppState>();
     // publish the client so user-triggered commands (dodge) can reach it.
@@ -108,7 +118,7 @@ async fn run_session(app: &AppHandle, credentials: &Credentials) -> Result<()> {
     if let (Some(port), Some(token)) = (credentials.riot_port, credentials.riot_token.as_deref()) {
         match LcuClient::from_parts(port, token) {
             Ok(riot) => *state.riot_client.write() = Some(riot),
-            Err(error) => eprintln!("expose: could not build riot client: {error}"),
+            Err(error) => log::warn!("could not build riot client: {error}"),
         }
     }
 
@@ -123,6 +133,7 @@ async fn run_session(app: &AppHandle, credentials: &Credentials) -> Result<()> {
     }
 
     let stream = websocket::connect(credentials).await?;
+    log::info!("connected to the league client event stream");
     features::set_status(app, ConnectionStatus::Connected);
     read_loop(app, &client, stream).await;
     Ok(())
@@ -152,7 +163,7 @@ async fn read_loop(app: &AppHandle, client: &LcuClient, mut stream: WsStream) {
                     Ok(Message::Close(_)) => break,
                     Ok(_) => {}
                     Err(error) => {
-                        eprintln!("expose: websocket read error: {error}");
+                        log::warn!("websocket read error: {error}");
                         break;
                     }
                 }
@@ -162,7 +173,7 @@ async fn read_loop(app: &AppHandle, client: &LcuClient, mut stream: WsStream) {
             // on next() forever.
             _ = ping.tick() => {
                 if last_seen.elapsed() >= IDLE_TIMEOUT {
-                    eprintln!("expose: lcu websocket idle, reconnecting");
+                    log::info!("lcu websocket idle, reconnecting");
                     break;
                 }
                 if stream.send(Message::Ping(Default::default())).await.is_err() {

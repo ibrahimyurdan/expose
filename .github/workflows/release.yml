@@ -17,11 +17,28 @@ jobs:
         include:
           - platform: macos-latest
             args: "--target universal-apple-darwin"
+          # windows ships just the nsis setup .exe. skipping the wix .msi keeps
+          # the job shorter and leaves out a second installer toolchain that
+          # could fail the whole windows build.
           - platform: windows-latest
-            args: ""
+            args: "--bundles nsis"
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      # the installers take their version from tauri.conf.json and the in-app
+      # update check from Cargo.toml, so a tag that disagrees with either would
+      # ship mislabeled builds. bump both before tagging.
+      - name: check the tag matches the app version
+        shell: bash
+        run: |
+          app_version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          # windows checkouts end lines with \r\n, so match up to the closing quote.
+          crate_version=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1)
+          if [ "$GITHUB_REF_NAME" != "v$app_version" ] || [ "$crate_version" != "$app_version" ]; then
+            echo "tag $GITHUB_REF_NAME, tauri.conf.json $app_version and Cargo.toml $crate_version must agree"
+            exit 1
+          fi
 
       - name: install node
         uses: actions/setup-node@v4
@@ -48,23 +65,42 @@ jobs:
       - name: install frontend dependencies
         run: npm ci
 
-      - name: build and publish
-        uses: tauri-apps/tauri-action@v0
+      # macos signing + notarization. an unset secret still arrives as an empty
+      # variable, and tauri treats any defined APPLE_CERTIFICATE (even an empty
+      # one) as a request to sign, which then fails. so only the secrets that
+      # are actually set are passed on; with none set, the build ships unsigned.
+      - name: pass on the macos signing secrets that are set
+        if: matrix.platform == 'macos-latest'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macos signing + notarization. when any of these is unset the
-          # workflow still runs and ships an unsigned build; set all to enable
-          # signing and notarization automatically.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value=$(printenv "$name" || true)
+            if [ -n "$value" ]; then
+              {
+                echo "$name<<EXPOSE_END_OF_$name"
+                printf '%s\n' "$value"
+                echo "EXPOSE_END_OF_$name"
+              } >> "$GITHUB_ENV"
+            else
+              echo "$name is not set"
+            fi
+          done
+
+      - name: build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Expose ${{ github.ref_name }}"
-          releaseBody: "Download the installer for your platform from the assets below."
+          releaseBody: "Download the installer for your platform from the assets below: the `.dmg` for macOS, or the `-setup.exe` for Windows."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

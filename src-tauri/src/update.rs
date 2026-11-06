@@ -6,7 +6,9 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
+
+use crate::state::AppState;
 
 const REPO: &str = "ibrahimyurdan/expose";
 
@@ -35,6 +37,7 @@ pub async fn check(app: AppHandle) {
             url: String::new(),
         },
     };
+    *app.state::<AppState>().update.write() = Some(info.clone());
     let _ = app.emit("expose://update", info);
 }
 
@@ -56,7 +59,13 @@ async fn fetch_latest() -> Option<(String, String)> {
         return None;
     }
     let value: serde_json::Value = response.json().await.ok()?;
-    let tag = value.get("tag_name")?.as_str()?.to_string();
+    // tags look like "v0.2.0"; keep the bare version so it reads like `current`.
+    let tag = value
+        .get("tag_name")?
+        .as_str()?
+        .trim()
+        .trim_start_matches('v')
+        .to_string();
     let url = value
         .get("html_url")
         .and_then(|value| value.as_str())
