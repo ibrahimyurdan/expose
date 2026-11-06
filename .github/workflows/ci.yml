@@ -40,3 +40,29 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  windows-installer:
+    # build the real windows setup .exe the release ships, so a packaging break
+    # shows up here instead of on release day. the installer is attached to the
+    # run as an artifact, handy for trying a build before tagging it.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      # aws-lc-rs (pulled in by rustls) assembles with nasm on windows.
+      - name: install nasm
+        uses: ilammy/setup-nasm@v1
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - run: npm ci
+      - run: npm run tauri build -- --bundles nsis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expose-windows-setup
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error

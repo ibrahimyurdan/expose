@@ -35,6 +35,7 @@ export const bridge = {
   setRevealRanked: (enabled: boolean) => invoke<void>("set_reveal_ranked", { enabled }),
   setLaunchAtLogin: (enabled: boolean) => invoke<void>("set_launch_at_login", { enabled }),
   openScout: () => invoke<void>("open_scout"),
+  getUpdate: () => invoke<UpdateInfo | null>("get_update"),
 
   onStatus: (handler: (status: ConnectionStatus) => void): Promise<UnlistenFn> =>
     listen<ConnectionStatus>(EVENT_STATUS, (event) => handler(event.payload)),

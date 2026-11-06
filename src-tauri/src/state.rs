@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 
 use crate::lcu::client::LcuClient;
 use crate::models::{ChampionData, ConnectionStatus, Summoner, Teammate};
+use crate::update::UpdateInfo;
 
 #[derive(Default)]
 pub struct AppState {
@@ -45,4 +46,7 @@ pub struct AppState {
     // guards the once-per-champ-select resolution notice (no riot client, reveal
     // disabled, chat read failed) so it does not toast on every session update.
     pub notified: AtomicBool,
+    // the startup update check result. kept so the settings panel can read it
+    // whenever it opens; the one-off event fires before the panel exists.
+    pub update: RwLock<Option<UpdateInfo>>,
 }

@@ -11,6 +11,7 @@ use std::sync::atomic::Ordering;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::error::Error;
 use crate::features::{set_status, EVENT_PHASE, EVENT_TEAMMATES};
 use crate::lcu::client::LcuClient;
 use crate::models::{
@@ -94,7 +95,7 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
     maybe_auto_open(app, &teammates, region.as_deref());
 
     if let Err(error) = app.emit(EVENT_TEAMMATES, &teammates) {
-        eprintln!("expose: could not emit teammates: {error}");
+        log::warn!("could not emit teammates: {error}");
     }
 }
 
@@ -112,7 +113,7 @@ fn maybe_auto_open(app: &AppHandle, teammates: &[Teammate], region: Option<&str>
     if let Some(url) = crate::scout::scout_url(&provider, teammates, region) {
         use tauri_plugin_opener::OpenerExt;
         if let Err(error) = app.opener().open_url(url, None::<&str>) {
-            eprintln!("expose: could not auto-open scout: {error}");
+            log::warn!("could not auto-open scout: {error}");
         }
     }
 }
@@ -147,9 +148,9 @@ async fn resolve_from_session(
                     summoner
                 }
                 Err(error) => {
-                    eprintln!(
-                        "expose: could not resolve summoner {}: {error}",
-                        player.puuid
+                    log::warn!(
+                        "could not resolve a teammate's summoner: {}",
+                        lookup_failure(&error)
                     );
                     continue;
                 }
@@ -190,7 +191,7 @@ async fn resolve_from_chat(
     let state = app.state::<AppState>();
     let riot = state.riot_client.read().clone();
     let Some(riot) = riot else {
-        eprintln!("expose: anonymous champ select but no riot client available");
+        log::info!("anonymous champ select but no riot client available");
         notify_once(
             app,
             NoticeLevel::Error,
@@ -202,7 +203,7 @@ async fn resolve_from_chat(
     let participants = match riot.chat_participants().await {
         Ok(participants) => participants,
         Err(error) => {
-            eprintln!("expose: could not read chat participants: {error}");
+            log::warn!("could not read chat participants: {error}");
             notify_once(
                 app,
                 NoticeLevel::Error,
@@ -286,11 +287,25 @@ fn notify_once(app: &AppHandle, level: NoticeLevel, message: &str) {
     }
 }
 
-fn show_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
+// describes a failed summoner lookup without its request path or url, which
+// carry the teammate's puuid: an identifier of another player that should not
+// end up in the log file.
+fn lookup_failure(error: &Error) -> String {
+    match error {
+        Error::UnexpectedStatus { status, .. } => {
+            format!("the league client returned status {status}")
+        }
+        Error::Http(error) if error.is_timeout() => "the request timed out".to_string(),
+        Error::Http(error) if error.is_decode() => "the response could not be read".to_string(),
+        _ => "the request failed".to_string(),
     }
+}
+
+// pops the panel forward as champ select begins. windows only lets a background
+// app take focus by faking an alt keypress, which would cut into typing in the
+// client, so there it is only shown; the panel is always on top anyway.
+fn show_window(app: &AppHandle) {
+    crate::reveal_main_window(app, cfg!(not(target_os = "windows")));
 }
 
 fn hide_window(app: &AppHandle) {

@@ -46,6 +46,7 @@
       "icons/icon.ico"
     ],
     "category": "Utility",
+    "publisher": "ibrahimyurdan",
     "shortDescription": "Surface champ-select teammates, auto-accept queue pops, and dodge in one click",
     "longDescription": "Expose is a lightweight tray companion for the League of Legends client. It surfaces the summoner names of your teammates during ranked champion select, can auto-accept queue ready checks, and offers a one-click dodge."
   },

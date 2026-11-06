@@ -33,14 +33,14 @@ see [scope](#scope) below for what is intentionally left out.
 prebuilt installers are published on the [releases page](https://github.com/ibrahimyurdan/expose/releases):
 
 - macos: download the `.dmg`, open it, and drag expose to applications.
-- windows: download the `.msi` and run it.
+- windows: download `Expose_<version>_x64-setup.exe` and run it. it installs for your user only (no admin prompt) and adds a start menu entry. if the pc is missing microsoft's webview2 runtime, the installer fetches it.
 
 the app is not code signed yet, so the first launch shows a warning:
 
 - macos: right click the app and choose open, or run `xattr -dr com.apple.quarantine "/Applications/Expose.app"`.
 - windows: on the smartscreen prompt choose "more info" then "run anyway".
 
-after launch, expose lives in the tray. left click the tray icon to show or hide the window; right click for a small menu.
+on macos expose lives in the dock. on windows it opens its window when you start it and lives in the notification area by the clock: left click the tray icon to show or hide the window, right click it for a small menu with quit. closing the window only hides it. windows 11 may tuck a new tray icon behind the `^` arrow; drag it onto the taskbar to keep it in view.
 
 ## build from source
 
@@ -68,7 +68,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
 ## release & signing
 
-tagging `v*.*.*` triggers `.github/workflows/release.yml`, which builds the macos universal `.dmg` and the windows `.msi` and attaches them to a draft github release.
+tagging `v*.*.*` triggers `.github/workflows/release.yml`, which builds the macos universal `.dmg` and the windows setup `.exe` and attaches them to a draft github release. the draft stays hidden from the public until you press publish, so you can download and try the installers first. ci also builds the windows setup `.exe` on every push to main and every pull request, and keeps it as a download on the run page.
 
 to skip the macos "unidentified developer" warning, set these repository secrets and the workflow will sign + notarize automatically:
 
@@ -83,7 +83,7 @@ without these secrets the workflow still runs and ships an unsigned build. an in
 
 ## how it works
 
-the rust backend connects to two local apis: the **league client** (lcu) for champ select, matchmaking, and dodging, and the **riot client** for the chat service that still reports real names during anonymous ranked champ select. each advertises a random port and an auth token via a lockfile and the league process command line; expose finds them either way and connects over the self-signed https and websocket endpoints (accepted only because the host is always 127.0.0.1).
+the rust backend connects to two local apis: the **league client** (lcu) for champ select, matchmaking, and dodging, and the **riot client** for the chat service that still reports real names during anonymous ranked champ select. each advertises a random port and an auth token via a lockfile and the league process command line; expose finds them either way (on windows it also reads riot's install metadata, so league can live on any drive) and connects over the self-signed https and websocket endpoints (accepted only because the host is always 127.0.0.1).
 
 a single supervisor task owns the connection lifecycle: it detects the client (a 2 second poll plus a file watcher on the lockfile directory), subscribes to two events, dispatches them to the features, and reconnects when the client comes and goes.
 
