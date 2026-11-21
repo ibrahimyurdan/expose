@@ -38,11 +38,11 @@ interface Verdict {
 function verdictFor(lobby: LobbyView, revealRanked: boolean): Verdict {
   const { summary } = lobby;
   const teammates = lobby.players.filter((player) => !player.isSelf);
-  const matching = lobby.anonymous && lobby.unmatched.length > 0;
-  const loading = teammates.filter(
-    (player) => player.statsPending || (player.identity === null && matching),
-  ).length;
-  const checked = teammates.filter((player) => player.stats !== null).length;
+  const loading = teammates.filter((player) => player.statsPending || player.matching).length;
+  // checked means there was a match history to look through: stats that
+  // failed to load raise no flags, and must not count toward an all-clear.
+  const checked = teammates.filter((player) => player.stats?.historyLoaded === true).length;
+  const named = teammates.filter((player) => player.identity !== null).length;
 
   // what the second line says when nothing more pressing needs saying. it is a
   // short status, so no full stops.
@@ -86,12 +86,13 @@ function verdictFor(lobby: LobbyView, revealRanked: boolean): Verdict {
     return {
       tone: "neutral",
       icon: EyeOff,
-      title: "No stats for your teammates",
-      detail: !lobby.anonymous
-        ? "Their stats couldn't be loaded"
-        : revealRanked
-          ? "Their names couldn't be matched"
-          : "Ranked matching is off in settings",
+      title: "Couldn't check your teammates",
+      detail:
+        !lobby.anonymous || named > 0
+          ? "Their match history couldn't be loaded"
+          : revealRanked
+            ? "Their names couldn't be matched"
+            : "Ranked matching is off in settings",
     };
   }
   return {
@@ -124,7 +125,7 @@ export function LobbySummary({
   // scouting needs at least one teammate's riot id, matched or not.
   const canScout =
     lobby.unmatched.length > 0 ||
-    lobby.players.some((player) => !player.isSelf && player.identity !== null);
+    lobby.players.some((player) => !player.isSelf && Boolean(player.identity?.gameName));
 
   const scout = () => {
     bridge

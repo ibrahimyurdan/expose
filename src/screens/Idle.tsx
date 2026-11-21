@@ -7,7 +7,7 @@ import { Toggle } from "@/components/ui/toggle";
 import type { LastLobby } from "@/hooks/useLobby";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import { capitalize, queueName, timeAgo } from "@/lib/format";
-import type { Summary } from "@/types";
+import type { LobbyView } from "@/types";
 
 // connected to league, not in champ select: the auto-accept switch up front,
 // what happens next, and a short recap of the last lobby once there is one.
@@ -71,10 +71,10 @@ function LastLobbyCard({ last }: { last: LastLobby }) {
   // the riot client listed that never got tied to a slot.
   const names = [
     ...lobby.players
-      .filter((player) => !player.isSelf && player.identity)
+      .filter((player) => !player.isSelf)
       .map((player) => player.identity?.gameName ?? ""),
     ...lobby.unmatched.map((name) => name.gameName),
-  ];
+  ].filter((name) => name !== "");
 
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2">
@@ -89,7 +89,7 @@ function LastLobbyCard({ last }: { last: LastLobby }) {
       <Card className="flex flex-col gap-2 p-4">
         <div className="flex items-center justify-between gap-3">
           <span className="truncate text-base font-medium text-fg">{queueName(lobby.queueId)}</span>
-          <SummaryChip summary={lobby.summary} />
+          <SummaryChip lobby={lobby} />
         </div>
         <p className="truncate text-sm text-fg-secondary" title={names.join(", ")}>
           {names.length > 0 ? names.join(" · ") : "Teammate names stayed hidden."}
@@ -99,11 +99,20 @@ function LastLobbyCard({ last }: { last: LastLobby }) {
   );
 }
 
-function SummaryChip({ summary }: { summary: Summary }) {
-  const tone = summary.redFlags > 0 ? "red" : summary.warnings > 0 ? "amber" : "green";
+// the last lobby's verdict. an all-clear in green only when every teammate's
+// match history was looked through; a lobby left before that says so.
+function SummaryChip({ lobby }: { lobby: LobbyView }) {
+  const { summary } = lobby;
+  const teammates = lobby.players.filter((player) => !player.isSelf);
+  const checked = teammates.filter((player) => player.stats?.historyLoaded === true).length;
+  const flagged = summary.redFlags > 0 || summary.warnings > 0;
+  const all = teammates.length > 0 && checked === teammates.length;
+  const tone = summary.redFlags > 0 ? "red" : summary.warnings > 0 ? "amber" : all ? "green" : "neutral";
+  const label =
+    flagged || all ? capitalize(summary.label) : checked === 0 ? "Not checked" : "Partly checked";
   return (
-    <Chip tone={tone} title={capitalize(summary.label)}>
-      {capitalize(summary.label)}
+    <Chip tone={tone} title={label}>
+      {label}
     </Chip>
   );
 }

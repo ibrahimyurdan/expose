@@ -17,12 +17,21 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 // solo/duo rank: a small diamond and the tier in the tier's color, then lp.
-// a player without a solo/duo rank this season reads "Unranked".
-export function RankBadge({ rank, className }: { rank: RankView | null; className?: string }) {
+// a player without a solo/duo rank this season reads "Unranked"; a rank that
+// could not be loaded shows nothing rather than a guess.
+export function RankBadge({
+  rank,
+  unranked,
+  className,
+}: {
+  rank: RankView | null;
+  unranked: boolean;
+  className?: string;
+}) {
   if (!rank) {
-    return (
+    return unranked ? (
       <span className={cn("text-sm whitespace-nowrap text-fg-secondary", className)}>Unranked</span>
-    );
+    ) : null;
   }
   const tier = rank.tier.toUpperCase();
   const color = TIER_COLORS[tier] ?? "text-fg";

@@ -58,6 +58,10 @@ export interface PlayerView {
   championId: number;
   spells: [number, number];
   identity: IdentityView | null;
+  // hidden, not matched yet, and the backend is still working on it (the
+  // chat has not answered, or a guess waits for stats). false once there is
+  // nothing left to try: the name stays hidden.
+  matching: boolean;
   stats: StatsView | null;
   // stats are being fetched for this player.
   statsPending: boolean;
@@ -82,8 +86,13 @@ export interface NameView {
 // each piece is null when its own request failed or has no data.
 export interface StatsView {
   level: number | null;
-  // ranked solo/duo, null when unranked.
+  // ranked solo/duo, null when unranked or when it could not be loaded.
   rank: RankView | null;
+  // the ranked stats came back without a solo/duo rank. rank null with this
+  // false means the rank is unknown.
+  unranked: boolean;
+  // a match history with games came back. false when it failed or was empty.
+  historyLoaded: boolean;
   // the last summoner's rift games, newest first.
   recent: GameView[];
   // (kills + assists) / deaths over the recent games.

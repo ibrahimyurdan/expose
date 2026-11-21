@@ -343,6 +343,8 @@ function statsFor(player: FixturePlayer, now: number): StatsView {
   return {
     level: player.level,
     rank: player.rank,
+    unranked: player.rank === null,
+    historyLoaded: true,
     recent,
     kda: (kills + assists) / Math.max(1, deaths),
     winRate: player.winRate,
@@ -438,6 +440,9 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
       identity: resolved
         ? { ...player.name, kind, confidence: kind === "guess" ? "medium" : "high" }
         : null,
+      // resolving: the chat answered and the names are being placed. hidden:
+      // the riot client never answered, so there is nothing left to try.
+      matching: !resolved && variant === "resolving",
       stats,
       statsPending: loading,
       flags: stats && !player.isSelf ? player.flags : [],

@@ -1,4 +1,5 @@
 import { CircleArrowUp, Eye, Settings as SettingsIcon, X } from "lucide-react";
+import type { MouseEvent } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { Pill } from "@/components/ui/pill";
@@ -36,10 +37,21 @@ export function Header({
 }) {
   const mac = document.documentElement.classList.contains("vibrancy");
   const state = status ? STATUS[status] : null;
+  // tauri zooms the window when its drag region is double-clicked, which
+  // would blow this small always-on-top panel up over the league client. the
+  // drag script listens on the document, so stopping the double-click here
+  // keeps the drag and drops the zoom.
+  const noZoom = (event: MouseEvent) => {
+    if (event.detail >= 2) {
+      event.stopPropagation();
+    }
+  };
 
   return (
     <header
       data-tauri-drag-region={mac ? "deep" : undefined}
+      onMouseDown={mac ? noZoom : undefined}
+      onMouseUp={mac ? noZoom : undefined}
       className="flex h-11 shrink-0 items-center gap-3 border-b border-border px-4 mac:pl-18"
     >
       <div className="flex shrink-0 items-center gap-2">

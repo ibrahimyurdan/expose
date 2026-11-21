@@ -15,8 +15,8 @@ const POINTS: { icon: LucideIcon; title: string; text: string }[] = [
   },
   {
     icon: DoorOpen,
-    title: "Dodge in one click or at the last second",
-    text: "Leave a lobby yourself, or arm a dodge that fires just before it locks in.",
+    title: "Dodge now or at the last second",
+    text: "Leave a lobby with two clicks, or arm a dodge that fires just before it locks in.",
   },
 ];
 

@@ -48,7 +48,11 @@ export function PlayerDetail({
         <Fact label="Level">{stats.level ?? "Unknown"}</Fact>
         <Fact label="Ranked this season">
           {!rank ? (
-            "Unranked"
+            stats.unranked ? (
+              "Unranked"
+            ) : (
+              "Unknown"
+            )
           ) : ranked > 0 ? (
             <>
               {rank.wins}W {rank.losses}L
@@ -65,7 +69,11 @@ export function PlayerDetail({
 
       <Roles roles={stats.roles} slot={player.position} />
 
-      <RecentGames games={stats.recent.slice(0, 10)} champions={champions} />
+      <RecentGames
+        games={stats.recent.slice(0, 10)}
+        loaded={stats.historyLoaded}
+        champions={champions}
+      />
 
       {player.scoutUrl ? (
         <Button
@@ -165,7 +173,16 @@ function Roles({ roles, slot }: { roles: RoleShare[]; slot: Position | null }) {
 // newest first. each shows the result, the champion's portrait, k/d/a and how
 // long ago; the champion's name and the game's length are on hover, and
 // screen readers hear each game as one sentence.
-function RecentGames({ games, champions }: { games: GameView[]; champions: ChampionData | null }) {
+function RecentGames({
+  games,
+  loaded,
+  champions,
+}: {
+  games: GameView[];
+  // a match history came back; without one there is nothing to list.
+  loaded: boolean;
+  champions: ChampionData | null;
+}) {
   const id = useId();
   const now = useMinuteClock();
   return (
@@ -210,7 +227,9 @@ function RecentGames({ games, champions }: { games: GameView[]; champions: Champ
           })}
         </ol>
       ) : (
-        <p className="text-sm text-fg-secondary">No Summoner's Rift games lately.</p>
+        <p className="text-sm text-fg-secondary">
+          {loaded ? "No Summoner's Rift games lately." : "No match history to show."}
+        </p>
       )}
     </section>
   );

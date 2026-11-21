@@ -120,7 +120,10 @@ function Shell() {
         onToggleSettings={() => setSettingsOpen((open) => !open)}
         minimal={screen === "welcome" || screen === "loading"}
       />
-      <main ref={main} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      {/* relative: the screen-reader-only text inside is positioned absolutely;
+          main has to contain it, or it stretches the document past the window
+          and scrolling a row into view slides the header away. */}
+      <main ref={main} className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div key={screen} className="flex min-h-full animate-in flex-col duration-200 fade-in-0">
           {content}
         </div>

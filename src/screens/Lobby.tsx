@@ -45,7 +45,6 @@ function ChampSelect({
   settings: Settings;
 }) {
   const scoutLabel = settings.scoutProvider === "ugg" ? "U.GG" : "OP.GG";
-  const matching = lobby.anonymous && lobby.unmatched.length > 0;
   const [sentinel, stuck] = useStuck();
 
   // one open row at a time, forgotten when a new lobby starts.
@@ -82,7 +81,6 @@ function ChampSelect({
               key={player.key}
               player={player}
               champions={champions}
-              matching={matching}
               expanded={openKey === player.key}
               onToggle={() => toggle(player.key)}
               scoutLabel={scoutLabel}

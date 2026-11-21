@@ -51,7 +51,6 @@ const MATCH_HINTS: Record<Exclude<MatchKind, "own" | "guess">, string> = {
 export function PlayerRow({
   player,
   champions,
-  matching,
   expanded,
   onToggle,
   scoutLabel,
@@ -59,9 +58,6 @@ export function PlayerRow({
 }: {
   player: PlayerView;
   champions: ChampionData | null;
-  // the riot client listed names that are not tied to slots yet, so an
-  // unknown teammate is still being matched rather than hidden for good.
-  matching: boolean;
   expanded: boolean;
   onToggle: () => void;
   scoutLabel: string;
@@ -70,7 +66,9 @@ export function PlayerRow({
   const detailId = useId();
   const card = useRef<HTMLElement>(null);
   const { identity, stats } = player;
-  const loading = player.statsPending || (!player.isSelf && identity === null && matching);
+  // the backend says when a hidden teammate is still being matched, rather
+  // than hidden for good.
+  const loading = player.statsPending || player.matching;
   const expandable = stats !== null;
   const open = expanded && stats !== null;
 
@@ -85,8 +83,13 @@ export function PlayerRow({
   }, [open]);
 
   // what the client shows for the slot: the alias in ranked, else the name.
-  const title = player.alias ?? identity?.gameName ?? (player.isSelf ? "You" : "Teammate");
+  // a match can come before its name does, so an empty name falls through.
+  const title = player.alias || identity?.gameName || (player.isSelf ? "You" : "Teammate");
+  // a name league shows (normal games, your party): the whole riot id, since
+  // line two has no room to repeat it.
+  const shown = !player.alias && identity && identity.gameName ? identity : null;
   const champion = championName(champions, player.championId);
+  const picked = player.championId > 0;
 
   return (
     <li
@@ -116,12 +119,28 @@ export function PlayerRow({
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex h-5 items-center gap-3">
               <p className="flex min-w-0 flex-1 items-baseline gap-2">
-                <span className="max-w-[65%] shrink-0 truncate text-base font-semibold text-fg">
-                  {title}
-                </span>
+                {shown ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="max-w-[65%] shrink-0 truncate text-base font-semibold text-fg">
+                        {shown.gameName}
+                        {shown.tagLine ? (
+                          <span className="font-normal text-fg-secondary">#{shown.tagLine}</span>
+                        ) : null}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{riotId(shown)}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="max-w-[65%] shrink-0 truncate text-base font-semibold text-fg">
+                    {title}
+                  </span>
+                )}
                 <span className="min-w-0 truncate text-base text-fg-secondary">
-                  {champion ?? (player.championId > 0 ? null : "No pick yet")}
-                  {champion && stats && stats.championGames !== null ? (
+                  {/* the champion table may still be loading, or not know a
+                      brand new champion yet. */}
+                  {champion ?? (picked ? "Unknown champion" : "No pick yet")}
+                  {picked && stats && stats.championGames !== null ? (
                     <span className="text-sm"> · {plural(stats.championGames, "game")}</span>
                   ) : null}
                 </span>
@@ -129,13 +148,13 @@ export function PlayerRow({
               {loading ? (
                 <span aria-hidden className="skeleton h-3 w-20 shrink-0" />
               ) : stats ? (
-                <RankBadge rank={stats.rank} className="shrink-0" />
+                <RankBadge rank={stats.rank} unranked={stats.unranked} className="shrink-0" />
               ) : null}
             </div>
 
             <div className="flex h-4 items-center gap-3">
               <div className="flex min-w-0 flex-1 items-center">
-                <Identity player={player} matching={matching} loading={loading} />
+                <Identity player={player} loading={loading} />
               </div>
               <Form stats={stats} loading={loading} />
             </div>
@@ -169,15 +188,7 @@ export function PlayerRow({
 // line two, left: who the row is. "You" on your own row; behind an alias, the
 // matched riot id with how sure the match is; on a visible name (normal games,
 // where line one already shows it), the account level.
-function Identity({
-  player,
-  matching,
-  loading,
-}: {
-  player: PlayerView;
-  matching: boolean;
-  loading: boolean;
-}) {
+function Identity({ player, loading }: { player: PlayerView; loading: boolean }) {
   const { identity } = player;
 
   if (player.isSelf) {
@@ -198,7 +209,7 @@ function Identity({
   if (!identity) {
     return (
       <span className="truncate text-sm text-fg-secondary">
-        {matching ? "Matching name…" : "Name hidden"}
+        {player.matching ? "Matching name…" : "Name hidden"}
       </span>
     );
   }
@@ -265,6 +276,9 @@ function Form({ stats, loading }: { stats: StatsView | null; loading: boolean })
   }
   if (!stats) {
     return null;
+  }
+  if (!stats.historyLoaded) {
+    return <span className="shrink-0 text-sm text-fg-secondary">No match history</span>;
   }
   if (stats.recent.length === 0) {
     return <span className="shrink-0 text-sm text-fg-secondary">No recent games</span>;

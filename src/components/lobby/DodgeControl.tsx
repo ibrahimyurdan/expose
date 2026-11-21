@@ -8,12 +8,15 @@ import { usePushNotice } from "@/hooks/notices";
 import { useCountdown } from "@/hooks/useCountdown";
 import { lobbyReceivedAt } from "@/hooks/useLobby";
 import { bridge } from "@/lib/bridge";
-import { formatClock, formatPreciseClock, phaseLabel } from "@/lib/format";
+import { formatClock, formatPreciseClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { LobbyView } from "@/types";
 
 // how long the armed dodge button waits for its confirming click.
 const CONFIRM_MS = 3000;
+// a confirming click sooner than this after arming is the second half of a
+// double-click, not a decision, so it is ignored.
+const CONFIRM_GUARD_MS = 600;
 
 // the two ways out of a lobby, side by side: the "last second" switch, which
 // arms a dodge the backend fires just before the lobby locks in, and the dodge
@@ -32,17 +35,19 @@ export function DodgeControl({ lobby }: { lobby: LobbyView }) {
 function DodgeButton() {
   const [stage, setStage] = useState<"idle" | "confirm" | "leaving">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const armedAt = useRef(0);
   const push = usePushNotice();
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const onClick = () => {
     if (stage === "idle") {
+      armedAt.current = performance.now();
       setStage("confirm");
       timer.current = setTimeout(() => setStage("idle"), CONFIRM_MS);
       return;
     }
-    if (stage === "confirm") {
+    if (stage === "confirm" && performance.now() - armedAt.current >= CONFIRM_GUARD_MS) {
       clearTimeout(timer.current);
       setStage("leaving");
       // on success the lobby ends and this screen goes away.
@@ -53,8 +58,13 @@ function DodgeButton() {
     }
   };
 
-  // escape backs out of the confirm step.
+  // escape backs out of the confirm step, and a held enter or space cannot
+  // click through it.
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.repeat && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape" && stage === "confirm") {
       event.stopPropagation();
       clearTimeout(timer.current);
@@ -128,7 +138,7 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
     });
   };
 
-  const hint = `Leaves the lobby by itself when ${phaseLabel("FINALIZATION")} reaches ${formatPreciseClock(lead)}.`;
+  const hint = `Leaves the lobby by itself with ${formatPreciseClock(lead)} left to lock in.`;
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
