@@ -5,4 +5,5 @@
 // account even when riot hides the names.
 
 pub mod aliases;
+pub mod identity;
 pub mod session;

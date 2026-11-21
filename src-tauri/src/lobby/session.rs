@@ -117,7 +117,7 @@ impl SessionPlayer {
 
 // riot empties or zeroes the puuid of a hidden player and leaves it empty for a
 // bot or an unfilled slot; either way it names nobody.
-fn is_blank(id: &str) -> bool {
+pub fn is_blank(id: &str) -> bool {
     id.chars().all(|c| c == '0' || c == '-')
 }
 

@@ -1,0 +1,584 @@
+// exact identity matching: which real account sits in each slot of your team.
+//
+// in anonymous ranked champ select the league client hides every teammate
+// outside your party behind an obfuscated puuid, while the riot client's chat
+// still lists the real accounts in the room. resolve_exact runs four steps in
+// order, each touching only players still unresolved: you, anyone the session
+// names, the lobby's scramble key, then elimination. all four are exact, and a
+// hidden player is only ever matched to a name the riot client already lists,
+// so expose never reveals someone the riot client does not. whoever is left
+// can only be guessed, and a guess is always marked as one.
+
+use std::collections::{HashMap, HashSet};
+
+use serde::Serialize;
+
+use super::session::{is_blank, Session, SessionPlayer};
+
+// a real account in the champ select chat, as the riot client lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    pub puuid: String,
+    pub game_name: String,
+    pub tag_line: String,
+}
+
+// how a player was matched to their slot. every kind but guess is exact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MatchKind {
+    // the local player.
+    Own,
+    // shown by the session itself: a party member, or anyone in a queue that
+    // hides nobody.
+    Visible,
+    // a hidden player decoded with the lobby's scramble key.
+    Key,
+    // the one hidden player left, given the one name left.
+    Elimination,
+    // the best fit from recent games, never certain.
+    Guess,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+}
+
+// who sits in a slot. exact kinds always carry high confidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identity {
+    pub puuid: String,
+    pub game_name: String,
+    pub tag_line: String,
+    pub kind: MatchKind,
+    pub confidence: Confidence,
+}
+
+// reads a puuid written as 8-4-4-4-12 hex digits, in any case. anything else
+// (no dashes, braces, spaces, a group of the wrong length) is not a puuid.
+pub fn parse_uuid(text: &str) -> Option<u128> {
+    let mut groups = text.split('-');
+    let mut value: u128 = 0;
+    for length in [8, 4, 4, 4, 12] {
+        let group = groups.next()?;
+        if group.len() != length || !group.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return None;
+        }
+        value = (value << (4 * length)) | u128::from_str_radix(group, 16).ok()?;
+    }
+    groups.next().is_none().then_some(value)
+}
+
+// writes a puuid back in the lowercase 8-4-4-4-12 form riot uses.
+pub fn format_uuid(value: u128) -> String {
+    let hex = format!("{value:032x}");
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
+}
+
+// recovers the lobby's scramble key. riot derives every hidden player's
+// obfuscated puuid from the real one with a single 128-bit xor key per lobby,
+// so each (hidden, real) pair proposes key = hidden ^ real, and a key scores
+// one point for every hidden value it maps onto a real puuid. the best key is
+// accepted only when it scores at least two and no other key ties it, so a key
+// is used only once the data itself confirms it.
+//
+// two matches are never enough on their own: swapping them gives a second key
+// (key ^ a ^ b, for their real puuids a and b) that maps both players too. in
+// practice a key needs three hidden players in the chat.
+pub fn recover_key(hidden: &[u128], real: &[u128]) -> Option<u128> {
+    // distinct values only, so a repeated entry cannot vote twice. with both
+    // sides distinct, the pairs proposing a key are exactly the hidden values
+    // it maps onto a real puuid, so counting proposals counts the score.
+    let hidden: HashSet<u128> = hidden.iter().copied().collect();
+    let real: HashSet<u128> = real.iter().copied().collect();
+    let mut scores: HashMap<u128, usize> = HashMap::new();
+    for obfuscated in &hidden {
+        for puuid in &real {
+            *scores.entry(obfuscated ^ puuid).or_default() += 1;
+        }
+    }
+
+    let best = scores.values().copied().max()?;
+    let mut leaders = scores.into_iter().filter(|&(_, score)| score == best);
+    let (key, _) = leaders.next()?;
+    (best >= 2 && leaders.next().is_none()).then_some(key)
+}
+
+// the exact identities in this session, keyed by player key (see
+// SessionPlayer::key). candidates are the riot client's champ select chat
+// participants.
+pub fn resolve_exact(session: &Session, candidates: &[Candidate]) -> HashMap<String, Identity> {
+    let mut identities = HashMap::new();
+
+    // 1. you.
+    if let Some(player) = session.local_player() {
+        if let Some(puuid) = player.real_puuid() {
+            let identity = from_session(player, puuid, candidates, MatchKind::Own);
+            identities.insert(player.key(), identity);
+        }
+    }
+
+    // 2. anyone else the session shows with a real puuid. a hidden player is
+    // never revealed this way, even if a puuid slipped through.
+    for player in &session.my_team {
+        let key = player.key();
+        if player.is_hidden() || identities.contains_key(&key) {
+            continue;
+        }
+        if let Some(puuid) = player.real_puuid() {
+            let identity = from_session(player, puuid, candidates, MatchKind::Visible);
+            identities.insert(key, identity);
+        }
+    }
+
+    // the chat names no identity has used yet, each once.
+    let used: HashSet<String> = identities
+        .values()
+        .map(|identity| identity.puuid.to_ascii_lowercase())
+        .collect();
+    let mut seen = HashSet::new();
+    let mut free: Vec<&Candidate> = candidates
+        .iter()
+        .filter(|candidate| !is_blank(&candidate.puuid))
+        .filter(|candidate| {
+            let puuid = candidate.puuid.to_ascii_lowercase();
+            !used.contains(&puuid) && seen.insert(puuid)
+        })
+        .collect();
+
+    // 3. the scramble key. it decodes each hidden player's real puuid, and the
+    // match counts only when the chat lists that puuid. a player it decodes to
+    // anyone else is provably none of the free names, so they stay unmatched
+    // and elimination leaves them alone.
+    let hidden: Vec<&SessionPlayer> = session
+        .my_team
+        .iter()
+        .filter(|player| player.is_hidden() && !identities.contains_key(&player.key()))
+        .collect();
+    let obfuscated: Vec<u128> = hidden
+        .iter()
+        .filter_map(|player| parse_uuid(&player.obfuscated_puuid))
+        .collect();
+    let listed: Vec<u128> = free
+        .iter()
+        .filter_map(|candidate| parse_uuid(&candidate.puuid))
+        .collect();
+    let key = recover_key(&obfuscated, &listed);
+
+    let mut undecoded = Vec::new();
+    for player in hidden {
+        let decoded = key
+            .zip(parse_uuid(&player.obfuscated_puuid))
+            .map(|(key, obfuscated)| key ^ obfuscated);
+        let Some(decoded) = decoded else {
+            undecoded.push(player);
+            continue;
+        };
+        let position = free
+            .iter()
+            .position(|candidate| parse_uuid(&candidate.puuid) == Some(decoded));
+        if let Some(index) = position {
+            let candidate = free.swap_remove(index);
+            identities.insert(player.key(), from_candidate(candidate, MatchKind::Key));
+        }
+    }
+
+    // 4. one hidden player the key could not decode and one free name left:
+    // the name is theirs.
+    if let ([player], [candidate]) = (undecoded.as_slice(), free.as_slice()) {
+        identities.insert(
+            player.key(),
+            from_candidate(candidate, MatchKind::Elimination),
+        );
+    }
+
+    identities
+}
+
+// an identity for a player the session names. the name comes from the session,
+// else from the chat entry with the same puuid; it stays empty when neither has
+// one, and the puuid still says exactly who the player is.
+fn from_session(
+    player: &SessionPlayer,
+    puuid: &str,
+    candidates: &[Candidate],
+    kind: MatchKind,
+) -> Identity {
+    let (game_name, tag_line) = if player.game_name.is_empty() {
+        candidates
+            .iter()
+            .find(|candidate| candidate.puuid.eq_ignore_ascii_case(puuid))
+            .map(|candidate| (candidate.game_name.clone(), candidate.tag_line.clone()))
+            .unwrap_or_default()
+    } else {
+        (player.game_name.clone(), player.tag_line.clone())
+    };
+    Identity {
+        puuid: puuid.to_string(),
+        game_name,
+        tag_line,
+        kind,
+        confidence: Confidence::High,
+    }
+}
+
+fn from_candidate(candidate: &Candidate, kind: MatchKind) -> Identity {
+    Identity {
+        puuid: candidate.puuid.clone(),
+        game_name: candidate.game_name.clone(),
+        tag_line: candidate.tag_line.clone(),
+        kind,
+        confidence: Confidence::High,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // random-looking stand-ins: the lobby's scramble key, a second key for the
+    // ambiguity test, you, a duo partner, four hidden teammates' real puuids,
+    // and two chat names that belong to nobody in the lobby.
+    const KEY: u128 = 0x84cc_8700_e153_8ee5_3421_f8cd_18fb_2784;
+    const OTHER_KEY: u128 = 0x97d4_458c_282c_ad5c_22e5_ebcb_da46_8f06;
+    const YOU: u128 = 0xc89b_b161_8b7b_023c_7186_26eb_2edc_d61f;
+    const DUO: u128 = 0xabff_fb5c_6800_1666_5f5c_d115_31bd_4bcf;
+    const REAL: [u128; 4] = [
+        0x964f_eb34_601c_374e_8943_ac6e_9ae3_2dbe,
+        0x499d_6a12_a482_fe2e_6e63_9d64_65fd_cf78,
+        0x9e3f_4101_125b_f4b1_f679_5b2d_67da_3e32,
+        0x3b09_691e_a3e1_8152_935b_b49b_24d2_d57f,
+    ];
+    const STRANGERS: [u128; 2] = [
+        0xa7a8_ad86_a089_9a8c_75c5_0d04_ed48_757c,
+        0x281d_9854_8b1e_fd0b_8bbd_b4d1_0407_78cc,
+    ];
+    const NAMES: [&str; 4] = ["Player One", "Player Two", "Player Three", "Player Four"];
+
+    fn you() -> SessionPlayer {
+        SessionPlayer {
+            cell_id: 2,
+            puuid: format_uuid(YOU),
+            game_name: "Example Player".to_string(),
+            tag_line: "EXP".to_string(),
+            name_visibility_type: "VISIBLE".to_string(),
+            ..SessionPlayer::default()
+        }
+    }
+
+    fn hidden(cell_id: i64, obfuscated: u128) -> SessionPlayer {
+        SessionPlayer {
+            cell_id,
+            obfuscated_puuid: format_uuid(obfuscated),
+            name_visibility_type: "HIDDEN".to_string(),
+            ..SessionPlayer::default()
+        }
+    }
+
+    fn visible(cell_id: i64, puuid: u128) -> SessionPlayer {
+        SessionPlayer {
+            cell_id,
+            puuid: format_uuid(puuid),
+            name_visibility_type: "UNHIDDEN".to_string(),
+            ..SessionPlayer::default()
+        }
+    }
+
+    fn lobby(my_team: Vec<SessionPlayer>) -> Session {
+        Session {
+            game_id: 1,
+            local_player_cell_id: 2,
+            my_team,
+            ..Session::default()
+        }
+    }
+
+    fn candidate(puuid: u128, game_name: &str) -> Candidate {
+        Candidate {
+            puuid: format_uuid(puuid),
+            game_name: game_name.to_string(),
+            tag_line: "NA1".to_string(),
+        }
+    }
+
+    // you plus the four hidden teammates as the riot client lists them.
+    fn chat() -> Vec<Candidate> {
+        let mut chat = vec![candidate(YOU, "Example Player")];
+        chat.extend(
+            REAL.iter()
+                .zip(NAMES)
+                .map(|(&real, name)| candidate(real, name)),
+        );
+        chat
+    }
+
+    // how each slot was matched, in cell order; none when it was not.
+    fn kinds(session: &Session, identities: &HashMap<String, Identity>) -> Vec<Option<MatchKind>> {
+        session
+            .team_in_slot_order()
+            .iter()
+            .map(|player| identities.get(&player.key()).map(|identity| identity.kind))
+            .collect()
+    }
+
+    fn name_in(session: &Session, identities: &HashMap<String, Identity>, cell_id: i64) -> String {
+        let player = session
+            .my_team
+            .iter()
+            .find(|player| player.cell_id == cell_id)
+            .expect("the cell is on the team");
+        identities
+            .get(&player.key())
+            .map(|identity| identity.game_name.clone())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn parses_and_formats_uuids() {
+        let text = "8c29b6f9-de1a-44c1-ab55-d6ac857a23e0";
+        let value = parse_uuid(text).expect("a well formed uuid");
+        assert_eq!(value, 0x8c29_b6f9_de1a_44c1_ab55_d6ac_857a_23e0);
+        assert_eq!(format_uuid(value), text);
+        assert_eq!(parse_uuid(&text.to_uppercase()), Some(value));
+        assert_eq!(format_uuid(0), "00000000-0000-0000-0000-000000000000");
+        assert_eq!(
+            format_uuid(u128::MAX),
+            "ffffffff-ffff-ffff-ffff-ffffffffffff"
+        );
+
+        assert_eq!(parse_uuid("not-a-uuid"), None);
+        // 31 digits, dashed or not.
+        assert_eq!(parse_uuid("8c29b6f-de1a-44c1-ab55-d6ac857a23e0"), None);
+        assert_eq!(parse_uuid("8c29b6fde1a44c1ab55d6ac857a23e0"), None);
+        // the right digits in the wrong shape.
+        assert_eq!(parse_uuid("8c29b6f9de1a44c1ab55d6ac857a23e0"), None);
+        assert_eq!(parse_uuid("8c29b6f9de1a-44c1-ab55-d6ac-857a23e0"), None);
+        assert_eq!(parse_uuid("8c29b6f9-de1a-44c1-ab55-d6ac857a23e0-00"), None);
+        assert_eq!(parse_uuid("{8c29b6f9-de1a-44c1-ab55-d6ac857a23e0}"), None);
+        assert_eq!(parse_uuid(" 8c29b6f9-de1a-44c1-ab55-d6ac857a23e0"), None);
+        // a sign or a stray letter where a digit belongs.
+        assert_eq!(parse_uuid("+c29b6f9-de1a-44c1-ab55-d6ac857a23e0"), None);
+        assert_eq!(parse_uuid("8c29b6f9-de1a-44c1-ab55-d6ac857a23eg"), None);
+        assert_eq!(parse_uuid(""), None);
+    }
+
+    #[test]
+    fn recovers_the_shared_key() {
+        let hidden: Vec<u128> = REAL.iter().map(|real| real ^ KEY).collect();
+        // the chat lists you as well, and in no particular order.
+        let real = [REAL[2], YOU, REAL[0], REAL[3], REAL[1]];
+        assert_eq!(recover_key(&hidden, &real), Some(KEY));
+    }
+
+    #[test]
+    fn rejects_a_single_hidden_player() {
+        // every key scores one, which is not enough.
+        assert_eq!(recover_key(&[REAL[0] ^ KEY], &[YOU, REAL[0]]), None);
+        assert_eq!(recover_key(&[], &[YOU]), None);
+        assert_eq!(recover_key(&[REAL[0] ^ KEY], &[]), None);
+    }
+
+    #[test]
+    fn tolerates_a_player_missing_from_chat() {
+        let hidden: Vec<u128> = REAL.iter().map(|real| real ^ KEY).collect();
+        let real = [YOU, REAL[0], REAL[1], REAL[2]];
+        assert_eq!(recover_key(&hidden, &real), Some(KEY));
+    }
+
+    #[test]
+    fn rejects_ambiguous_keys() {
+        // two keys, each mapping two of the four hidden players into the chat.
+        let hidden = [
+            REAL[0] ^ KEY,
+            REAL[1] ^ KEY,
+            REAL[2] ^ OTHER_KEY,
+            REAL[3] ^ OTHER_KEY,
+        ];
+        let real = [YOU, REAL[0], REAL[1], REAL[2], REAL[3]];
+        assert_eq!(recover_key(&hidden, &real), None);
+
+        // two matches alone always tie: swapping them gives a second key,
+        // KEY ^ REAL[0] ^ REAL[1], that maps both hidden players into the chat.
+        let hidden = [REAL[0] ^ KEY, REAL[1] ^ KEY];
+        let real = [YOU, REAL[0], REAL[1]];
+        assert_eq!(recover_key(&hidden, &real), None);
+    }
+
+    #[test]
+    fn resolves_own_visible_key_and_elimination() {
+        // a key needs three players in the chat (see rejects_ambiguous_keys),
+        // so the five kinds take two lobbies. first: you, a duo partner the
+        // session shows without a name, and three hidden players.
+        let session = lobby(vec![
+            visible(0, DUO),
+            hidden(1, REAL[0] ^ KEY),
+            you(),
+            hidden(3, REAL[1] ^ KEY),
+            hidden(4, REAL[2] ^ KEY),
+        ]);
+        let candidates = [
+            candidate(YOU, "Example Player"),
+            candidate(DUO, "Duo Partner"),
+            candidate(REAL[0], NAMES[0]),
+            candidate(REAL[1], NAMES[1]),
+            candidate(REAL[2], NAMES[2]),
+        ];
+        let identities = resolve_exact(&session, &candidates);
+        assert_eq!(
+            kinds(&session, &identities),
+            [
+                Some(MatchKind::Visible),
+                Some(MatchKind::Key),
+                Some(MatchKind::Own),
+                Some(MatchKind::Key),
+                Some(MatchKind::Key),
+            ]
+        );
+        // your name comes from the session, the duo's from the chat.
+        assert_eq!(
+            identities[&format_uuid(YOU)],
+            Identity {
+                puuid: format_uuid(YOU),
+                game_name: "Example Player".to_string(),
+                tag_line: "EXP".to_string(),
+                kind: MatchKind::Own,
+                confidence: Confidence::High,
+            }
+        );
+        assert_eq!(name_in(&session, &identities, 0), "Duo Partner");
+        assert_eq!(
+            identities[&format_uuid(REAL[1] ^ KEY)],
+            Identity {
+                puuid: format_uuid(REAL[1]),
+                game_name: NAMES[1].to_string(),
+                tag_line: "NA1".to_string(),
+                kind: MatchKind::Key,
+                confidence: Confidence::High,
+            }
+        );
+        assert_eq!(name_in(&session, &identities, 1), NAMES[0]);
+        assert_eq!(name_in(&session, &identities, 4), NAMES[2]);
+
+        // second: three hidden players the key decodes, and a fourth riot sent
+        // without an obfuscated puuid, left with the one unused name.
+        let session = lobby(vec![
+            hidden(0, REAL[0] ^ KEY),
+            hidden(1, REAL[1] ^ KEY),
+            you(),
+            hidden(3, REAL[2] ^ KEY),
+            SessionPlayer {
+                obfuscated_puuid: String::new(),
+                ..hidden(4, 0)
+            },
+        ]);
+        let identities = resolve_exact(&session, &chat());
+        assert_eq!(
+            kinds(&session, &identities),
+            [
+                Some(MatchKind::Key),
+                Some(MatchKind::Key),
+                Some(MatchKind::Own),
+                Some(MatchKind::Key),
+                Some(MatchKind::Elimination),
+            ]
+        );
+        assert_eq!(name_in(&session, &identities, 4), NAMES[3]);
+        assert!(identities
+            .values()
+            .all(|identity| identity.confidence == Confidence::High));
+    }
+
+    #[test]
+    fn eliminates_without_a_key() {
+        // one hidden player is too few for a key, but the one name nobody
+        // else has used is theirs.
+        let session = lobby(vec![
+            visible(0, REAL[1]),
+            visible(1, REAL[2]),
+            you(),
+            visible(3, REAL[3]),
+            hidden(4, REAL[0] ^ KEY),
+        ]);
+        let identities = resolve_exact(&session, &chat());
+        assert_eq!(
+            kinds(&session, &identities),
+            [
+                Some(MatchKind::Visible),
+                Some(MatchKind::Visible),
+                Some(MatchKind::Own),
+                Some(MatchKind::Visible),
+                Some(MatchKind::Elimination),
+            ]
+        );
+        assert_eq!(name_in(&session, &identities, 4), NAMES[0]);
+    }
+
+    #[test]
+    fn never_reveals_players_absent_from_chat() {
+        // the fourth hidden player is not in the chat (riot's "hide my name",
+        // say), and two chat names belong to nobody the key decodes.
+        let session = lobby(vec![
+            hidden(0, REAL[0] ^ KEY),
+            hidden(1, REAL[1] ^ KEY),
+            you(),
+            hidden(3, REAL[2] ^ KEY),
+            hidden(4, REAL[3] ^ KEY),
+        ]);
+        let mut candidates = vec![
+            candidate(YOU, "Example Player"),
+            candidate(REAL[0], NAMES[0]),
+            candidate(REAL[1], NAMES[1]),
+            candidate(REAL[2], NAMES[2]),
+            candidate(STRANGERS[0], "Stranger One"),
+            candidate(STRANGERS[1], "Stranger Two"),
+        ];
+        let identities = resolve_exact(&session, &candidates);
+        assert_eq!(
+            kinds(&session, &identities),
+            [
+                Some(MatchKind::Key),
+                Some(MatchKind::Key),
+                Some(MatchKind::Own),
+                Some(MatchKind::Key),
+                None,
+            ]
+        );
+
+        // with one name left over the answer is the same: the key already
+        // shows that player is someone the chat does not list.
+        candidates.pop();
+        let identities = resolve_exact(&session, &candidates);
+        assert_eq!(kinds(&session, &identities)[4], None);
+    }
+
+    #[test]
+    fn kinds_serialize_like_the_frontend_expects() {
+        let kinds = [
+            MatchKind::Own,
+            MatchKind::Visible,
+            MatchKind::Key,
+            MatchKind::Elimination,
+            MatchKind::Guess,
+        ];
+        assert_eq!(
+            serde_json::to_value(kinds).unwrap(),
+            serde_json::json!(["own", "visible", "key", "elimination", "guess"])
+        );
+        let levels = [Confidence::High, Confidence::Medium, Confidence::Low];
+        assert_eq!(
+            serde_json::to_value(levels).unwrap(),
+            serde_json::json!(["high", "medium", "low"])
+        );
+    }
+}
