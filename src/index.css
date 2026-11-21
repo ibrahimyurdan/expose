@@ -2,101 +2,128 @@
 @import "tw-animate-css";
 
 /*
-  expose runs as an always-dark hextech themed panel, so the palette lives
-  directly on :root instead of behind a light/dark switch. colors are the
-  well known league client tones: deep navy surfaces, parchment text, and a
-  gold accent with a darker gold for ornate borders.
+  expose design tokens. the app is always dark: neutral graphite surfaces, one
+  blue accent for focus and primary actions, and red, amber and green kept for
+  flags and match results. these custom properties are the source of truth;
+  the @theme blocks below turn them into tailwind utilities such as bg-surface,
+  text-fg-secondary, border-border-strong and text-tier-gold.
 */
 :root {
-  --radius: 0.3rem;
+  --bg: #0d0f14;
+  --surface: #14171e;
+  --surface-raised: #1a1e27;
+  --border: #242935;
+  --border-strong: #303747;
 
-  --background: #0a1428;
-  --foreground: #f0e6d2;
+  --text: #e8eaf0;
+  --text-secondary: #a3aab8;
+  /* about 4:1 on the surfaces, so it is for hints, separators and icons, never
+     for text the player has to read. */
+  --text-muted: #6b7385;
 
-  --card: #0f1c33;
-  --card-foreground: #f0e6d2;
+  --accent: #5b8cff;
+  --accent-hover: #7aa2ff;
+  /* text and icons on an accent or red fill. white on the accent is only
+     3.2:1; this dark ink is about 6:1. */
+  --on-accent: #0d0f14;
 
-  --popover: #0c1830;
-  --popover-foreground: #f0e6d2;
+  --red: #f26b6b;
+  --red-bg: #2a1518;
+  --amber: #f2b84b;
+  --amber-bg: #2a2112;
+  --green: #4cc38a;
+  --green-bg: #11261d;
 
-  --primary: #c8aa6e;
-  --primary-foreground: #0a1428;
+  --tier-iron: #8a8a8a;
+  --tier-bronze: #b07a54;
+  --tier-silver: #a8b2bc;
+  --tier-gold: #d9b45a;
+  --tier-platinum: #4fb3a9;
+  --tier-emerald: #2fbf71;
+  --tier-diamond: #7d9cff;
+  --tier-master: #b46cff;
+  --tier-grandmaster: #ff6b6b;
+  --tier-challenger: #f5d76e;
+}
 
-  --secondary: #1a2740;
-  --secondary-foreground: #f0e6d2;
+/* start from an empty palette and scale, so only the tokens above exist and a
+   stray default (text-gray-400, rounded-xl) cannot creep back in. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
 
-  --muted: #16203a;
-  /* lifted from #a09b8c (4.4:1, fails AA at the 11px sizes used everywhere) to
-     ~5.6:1 while staying clearly subordinate to the parchment foreground. */
-  --muted-foreground: #b3ada0;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, "SF Pro Text", system-ui,
+    sans-serif;
 
-  --accent: #1f3050;
-  --accent-foreground: #f0e6d2;
+  /* 11, 12, 13, 15 and 18 px, each with a line height on the 4px grid. */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 16px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 15px;
+  --text-md--line-height: 20px;
+  --text-lg: 18px;
+  --text-lg--line-height: 24px;
 
-  /* a brighter alarm red so the confirm-dodge state reads urgent, not brick. */
-  --destructive: #e0473b;
-  --destructive-foreground: #f0e6d2;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
 
-  --border: #785a28;
-  --input: #785a28;
-  --ring: #c8aa6e;
+  /* cards 10px, controls 8px, pills use rounded-full. the two small radii are
+     for nested pieces such as a segmented option or a champion icon. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-control: 8px;
+  --radius-card: 10px;
 
-  /* hextech extras used by status dots and the wordmark */
-  --gold: #c8aa6e;
-  --gold-bright: #f0d6a0;
-  --gold-deep: #785a28;
-  --hex-teal: #0596aa;
-  --hex-teal-light: #cdfafa;
-  --status-waiting: #6c7689;
-  --status-connected: #0596aa;
-  --status-active: #c8aa6e;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(0 0 0 / 0.25);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-border-strong: var(--border-strong);
 
-  --color-gold: var(--gold);
-  --color-gold-bright: var(--gold-bright);
-  --color-gold-deep: var(--gold-deep);
-  --color-hex-teal: var(--hex-teal);
-  --color-hex-teal-light: var(--hex-teal-light);
-  --color-status-waiting: var(--status-waiting);
-  --color-status-connected: var(--status-connected);
-  --color-status-active: var(--status-active);
+  --color-fg: var(--text);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  --font-display: "Beaufort for LOL", "Cinzel", ui-serif, Georgia,
-    "Times New Roman", serif;
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+
+  --color-red: var(--red);
+  --color-red-bg: var(--red-bg);
+  --color-amber: var(--amber);
+  --color-amber-bg: var(--amber-bg);
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+
+  --color-tier-iron: var(--tier-iron);
+  --color-tier-bronze: var(--tier-bronze);
+  --color-tier-silver: var(--tier-silver);
+  --color-tier-gold: var(--tier-gold);
+  --color-tier-platinum: var(--tier-platinum);
+  --color-tier-emerald: var(--tier-emerald);
+  --color-tier-diamond: var(--tier-diamond);
+  --color-tier-master: var(--tier-master);
+  --color-tier-grandmaster: var(--tier-grandmaster);
+  --color-tier-challenger: var(--tier-challenger);
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
+/* mac:pl-18 and friends apply only inside the macos app (main.tsx sets the
+   class), for the traffic lights that sit over the top-left of the window. */
+@custom-variant mac (&:where(html.vibrancy *));
 
+@layer base {
   html,
   body,
   #root {
@@ -104,52 +131,75 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    color-scheme: dark;
     margin: 0;
+    background-color: var(--bg);
+    color: var(--text);
     font-family: var(--font-sans);
-    /* the window is a fixed size panel, so the body itself never scrolls */
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* the window frames one panel: the shell scrolls, the body never does. */
     overflow: hidden;
     -webkit-user-select: none;
     user-select: none;
     cursor: default;
   }
-}
 
-@layer components {
-  /* ornate gold framed surface used by the teammate cards and panels */
-  .hex-frame {
-    border: 1px solid var(--gold-deep);
-    background: linear-gradient(
-      180deg,
-      rgba(15, 28, 51, 0.92),
-      rgba(10, 20, 40, 0.92)
-    );
+  /* one focus treatment for everything that can take keyboard focus. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
-  /* the small uppercase letter spaced label style used across the ui. the
-     weight gives the serif fallback presence; 0.14em keeps 11px caps from
-     clipping their last glyph the way 0.18em could. */
-  .hex-label {
-    font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+  /* thin scrollbars in the surface colors (windows; macos keeps its overlay
+     bars). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
-  /* drains a bar left-to-right over the dodge auto-disarm window so the safety
-     timer is visible instead of silent. */
-  @keyframes dodge-drain {
-    from {
-      transform: scaleX(1);
-    }
-    to {
-      transform: scaleX(0);
-    }
+  img {
+    -webkit-user-drag: none;
   }
 }
 
-/* respect the os reduced-motion setting now that pulse/spin/drain are in play. */
+/* a placeholder block for data that is still loading. its shimmer is the only
+   gradient in the app. size it with h-* and w-* utilities. */
+@utility skeleton {
+  border-radius: var(--radius-xs);
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-raised) 25%,
+    var(--border) 37%,
+    var(--surface-raised) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+/* drains a bar left to right over a short safety window (the dodge confirm),
+   so the timer is visible instead of silent. */
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* respect the os reduced-motion setting for pulses, shimmers and drains. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -160,20 +210,9 @@
   }
 }
 
-/* on macos the window has a native frosted vibrancy behind it; a translucent
-   body lets the blur show through. enabled via the .vibrancy class set in
-   main.tsx, so windows and the browser preview stay fully opaque. */
+/* on macos the window has a native frosted vibrancy behind it, and a
+   translucent body lets the blur show through. main.tsx sets .vibrancy only in
+   the macos app, so windows and the browser preview stay opaque. */
 html.vibrancy body {
-  background-color: rgba(10, 20, 40, 0.75);
-}
-
-/* on macos the title-bar overlay puts the traffic lights in the top-left, so
-   the in-panel wordmark just clashes with them. hide it there and let the
-   status + gear group float to the right edge. the brand still shows on the
-   empty state and as the dock icon. */
-html.vibrancy header > div:first-child {
-  display: none;
-}
-html.vibrancy header {
-  justify-content: flex-end;
+  background: rgb(13 15 20 / 0.82);
 }

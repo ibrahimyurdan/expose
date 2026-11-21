@@ -84,7 +84,7 @@ export function TeammateRow({
         </div>
       </div>
       <Button
-        variant="outline"
+        variant="secondary"
         size="sm"
         onClick={() => bridge.openExternal(teammate.scoutUrl).catch(() => {})}
         className="border-gold-deep/40 bg-secondary/40 text-muted-foreground hover:border-gold hover:text-gold-bright"

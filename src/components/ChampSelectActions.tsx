@@ -41,7 +41,7 @@ export function ChampSelectActions({ teammates }: { teammates: Teammate[] }) {
     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
       {teammates.length > 0 ? (
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={handleScout}
           title="Open the whole team on your scout site"
@@ -53,7 +53,7 @@ export function ChampSelectActions({ teammates }: { teammates: Teammate[] }) {
         <span className="text-[11px] text-muted-foreground">resolving teammate names…</span>
       )}
       <Button
-        variant={armed ? "destructive" : "outline"}
+        variant={armed ? "dangerSolid" : "secondary"}
         size="sm"
         onClick={handleDodge}
         className={cn("relative overflow-hidden", armed && "animate-pulse [animation-duration:1.1s]")}

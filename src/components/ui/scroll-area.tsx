@@ -3,6 +3,9 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
+// a scroll container with a thin overlay scrollbar. radix lays the content out
+// as a table that grows to fit its widest line, which defeats truncation, so
+// the viewport forces it back to a normal block.
 function ScrollArea({
   className,
   children,
@@ -10,7 +13,7 @@ function ScrollArea({
 }: ComponentProps<typeof ScrollAreaPrimitive.Root>) {
   return (
     <ScrollAreaPrimitive.Root className={cn("relative overflow-hidden", className)} {...props}>
-      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:block!">
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
@@ -28,14 +31,14 @@ function ScrollBar({
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       orientation={orientation}
       className={cn(
-        "flex touch-none select-none transition-colors",
-        orientation === "vertical" && "h-full w-2 border-l border-l-transparent p-px",
-        orientation === "horizontal" && "h-2 flex-col border-t border-t-transparent p-px",
+        "flex touch-none p-0.5 select-none",
+        orientation === "vertical" && "h-full w-2",
+        orientation === "horizontal" && "h-2 flex-col",
         className,
       )}
       {...props}
     >
-      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-hex-teal/60" />
+      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border-strong transition-colors hover:bg-fg-muted" />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
 }

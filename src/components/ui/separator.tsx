@@ -3,8 +3,7 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
-// a gold gradient hairline that fades at both ends, echoing the hextech panel
-// dividers in the league client.
+// a one pixel hairline in the border color.
 function Separator({
   className,
   orientation = "horizontal",
@@ -16,7 +15,7 @@ function Separator({
       decorative={decorative}
       orientation={orientation}
       className={cn(
-        "shrink-0 bg-gradient-to-r from-transparent via-gold-deep to-transparent",
+        "shrink-0 bg-border",
         orientation === "horizontal" ? "h-px w-full" : "h-full w-px",
         className,
       )}
