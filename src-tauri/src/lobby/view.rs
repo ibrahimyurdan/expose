@@ -53,6 +53,10 @@ pub struct PlayerView {
     pub champion_id: i64,
     pub spells: (i64, i64),
     pub identity: Option<IdentityView>,
+    // hidden, not matched yet, and expose is still working on it: the chat
+    // has not answered, or a guess waits for a name's stats. false once
+    // there is nothing left to try, so the row can say the name stays hidden.
+    pub matching: bool,
     pub stats: Option<StatsView>,
     // matched, and their stats are on the way.
     pub stats_pending: bool,
@@ -84,8 +88,14 @@ pub struct NameView {
 #[serde(rename_all = "camelCase")]
 pub struct StatsView {
     pub level: Option<i64>,
-    // solo/duo; none while unranked there.
+    // solo/duo; none while unranked there or when the request failed.
     pub rank: Option<RankView>,
+    // the ranked stats came back without a solo/duo rank. with rank none and
+    // this false, the rank is unknown.
+    pub unranked: bool,
+    // a match history with games came back. false when it failed or was
+    // empty, which the "no match history" flag also says for teammates.
+    pub history_loaded: bool,
     // the newest summoner's rift games, newest first.
     pub recent: Vec<GameView>,
     // over the games the bad kda flag looks at.
@@ -169,6 +179,7 @@ pub fn build_view(
         let position = Position::from_assigned(&player.assigned_position);
         let champion_id = player.champion();
 
+        let matching = state.matching.contains(&key);
         let identity = state.identities.get(&key);
         let puuid = identity.and_then(|identity| canonical_puuid(&identity.puuid));
         let stats = puuid.as_ref().and_then(|puuid| state.stats.get(puuid));
@@ -213,6 +224,7 @@ pub fn build_view(
             champion_id,
             spells: (player.spell1_id, player.spell2_id),
             identity,
+            matching,
             stats: stats.map(|stats| stats_view(stats, champion_id)),
             stats_pending,
             flags,
@@ -290,6 +302,8 @@ fn stats_view(stats: &PlayerStats, champion_id: i64) -> StatsView {
             wins: rank.wins,
             losses: rank.losses,
         }),
+        unranked: stats.unranked,
+        history_loaded: history.is_some(),
         recent: history.map_or_else(Vec::new, |history| {
             history
                 .games
@@ -474,6 +488,7 @@ mod tests {
                 wins: 45,
                 losses: 40,
             }),
+            unranked: false,
             history: Some(PlayerHistory { games }),
             mastery: Some(HashMap::from([(266, 52_000)])),
         }
@@ -911,6 +926,7 @@ mod tests {
                 kind: MatchKind::Guess,
                 confidence: Confidence::Medium,
             }),
+            matching: false,
             stats: Some(StatsView {
                 level: Some(41),
                 rank: Some(RankView {
@@ -920,6 +936,8 @@ mod tests {
                     wins: 15,
                     losses: 9,
                 }),
+                unranked: false,
+                history_loaded: true,
                 recent: vec![GameView {
                     champion_id: 412,
                     win: false,
@@ -956,6 +974,7 @@ mod tests {
             champion_id: 0,
             spells: (4, 14),
             identity: None,
+            matching: true,
             stats: None,
             stats_pending: true,
             flags: Vec::new(),
@@ -1014,6 +1033,7 @@ mod tests {
                 "isAutofilled",
                 "isSelf",
                 "key",
+                "matching",
                 "position",
                 "scoutUrl",
                 "spells",
@@ -1039,11 +1059,13 @@ mod tests {
             [
                 "championGames",
                 "championPoints",
+                "historyLoaded",
                 "kda",
                 "level",
                 "rank",
                 "recent",
                 "roles",
+                "unranked",
                 "winRate",
             ]
         );
@@ -1079,6 +1101,10 @@ mod tests {
             assert!(me[field].is_null(), "{field}");
         }
         assert_eq!(me["isSelf"], true);
+        assert_eq!(me["matching"], true);
+        assert_eq!(teammate["matching"], false);
+        assert_eq!(stats["unranked"], false);
+        assert_eq!(stats["historyLoaded"], true);
         assert_eq!(me["statsPending"], true);
         assert_eq!(me["flags"], json!([]));
 

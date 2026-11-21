@@ -17,6 +17,7 @@ use super::identity::parse_uuid;
 use super::session::is_blank;
 use crate::error::{Error, Result};
 use crate::lcu::client::LcuClient;
+use crate::lenient::lenient;
 use crate::models::Summoner;
 
 // how many recent games are fetched per player.
@@ -24,6 +25,10 @@ pub const HISTORY_GAMES: usize = 20;
 
 // only summoner's rift games say how someone plays ranked.
 const SUMMONERS_RIFT: i64 = 11;
+// and only its standard queues: ranked solo/duo and flex, normal draft and
+// blind, quickplay, swiftplay and clash. bots, customs and the event modes
+// played on the same map (urf, one for all) say little about a ranked game.
+const STANDARD_QUEUES: [i64; 7] = [400, 420, 430, 440, 480, 490, 700];
 // a game under five minutes was a remake and says nothing about the player.
 const REMAKE_SECONDS: i64 = 300;
 // a bottom laner under this many creeps a minute was the support.
@@ -102,14 +107,19 @@ pub struct PlayerHistory {
 }
 
 impl PlayerHistory {
-    // the player's games in a match history response: summoner's rift only,
-    // remakes left out, newest first whatever order the client sent them in.
+    // the player's games in a match history response: summoner's rift's
+    // standard queues only, remakes left out, newest first whatever order the
+    // client sent them in.
     pub fn from_matches(list: &MatchHistoryList, puuid: &str) -> PlayerHistory {
         let mut games: Vec<GameSummary> = list
             .games
             .games
             .iter()
-            .filter(|game| game.map_id == SUMMONERS_RIFT && game.game_duration >= REMAKE_SECONDS)
+            .filter(|game| {
+                game.map_id == SUMMONERS_RIFT
+                    && STANDARD_QUEUES.contains(&game.queue_id)
+                    && game.game_duration >= REMAKE_SECONDS
+            })
             .filter_map(|game| summarize(game, puuid))
             .collect();
         games.sort_by_key(|game| Reverse(game.started_at_ms));
@@ -235,6 +245,9 @@ pub struct PlayerStats {
     pub game_name: Option<String>,
     pub tag_line: Option<String>,
     pub rank: Option<Rank>,
+    // the ranked stats came back without a solo/duo rank. a rank that is none
+    // with this false was never loaded, so it says nothing.
+    pub unranked: bool,
     pub history: Option<PlayerHistory>,
     // champion id to mastery points.
     pub mastery: Option<HashMap<i64, i64>>,
@@ -261,11 +274,17 @@ impl PlayerStats {
             ),
             None => (None, None, None),
         };
+        let rank = ranked.as_ref().and_then(RankedStats::solo_rank);
+        // an answer without a single queue is as empty as no answer.
+        let answered = ranked
+            .as_ref()
+            .is_some_and(|ranked| !ranked.queue_map.is_empty() || !ranked.queues.is_empty());
         PlayerStats {
             level,
             game_name,
             tag_line,
-            rank: ranked.and_then(|ranked| ranked.solo_rank()),
+            unranked: answered && rank.is_none(),
+            rank,
             history: history
                 .filter(|list| !list.games.games.is_empty())
                 .map(|list| PlayerHistory::from_matches(&list, puuid)),
@@ -278,12 +297,23 @@ impl PlayerStats {
     }
 }
 
+// one player's stats, and whether every request went through. only complete
+// stats are worth keeping for later lobbies.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fetched {
+    pub stats: PlayerStats,
+    pub complete: bool,
+}
+
 // fetches one player's stats. the four requests go out together, each once
 // the limit, shared by every player being fetched, has room for it.
-pub async fn fetch_stats(client: &LcuClient, puuid: &str, limit: &Semaphore) -> PlayerStats {
+pub async fn fetch_stats(client: &LcuClient, puuid: &str, limit: &Semaphore) -> Fetched {
     // nothing but a well formed puuid goes into a request path.
     if parse_uuid(puuid).is_none() {
-        return PlayerStats::default();
+        return Fetched {
+            stats: PlayerStats::default(),
+            complete: false,
+        };
     }
     let (summoner, ranked, history, mastery) = tokio::join!(
         limited(limit, client.summoner_by_puuid(puuid)),
@@ -291,13 +321,15 @@ pub async fn fetch_stats(client: &LcuClient, puuid: &str, limit: &Semaphore) -> 
         limited(limit, client.match_history(puuid, HISTORY_GAMES)),
         limited(limit, client.champion_mastery(puuid)),
     );
-    PlayerStats::from_parts(
-        loaded("summoner", summoner),
-        loaded("ranked stats", ranked),
-        loaded("match history", history),
-        loaded("champion mastery", mastery),
-        puuid,
-    )
+    let summoner = loaded("summoner", summoner);
+    let ranked = loaded("ranked stats", ranked);
+    let history = loaded("match history", history);
+    let mastery = loaded("champion mastery", mastery);
+    let complete = summoner.is_some() && ranked.is_some() && history.is_some() && mastery.is_some();
+    Fetched {
+        stats: PlayerStats::from_parts(summoner, ranked, history, mastery, puuid),
+        complete,
+    }
 }
 
 // runs a request once the limit has a permit free, holding it until the
@@ -337,12 +369,14 @@ impl StatsCache {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MatchHistoryList {
+    #[serde(deserialize_with = "lenient")]
     pub games: MatchHistoryGames,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MatchHistoryGames {
+    #[serde(deserialize_with = "lenient")]
     pub games: Vec<MatchHistoryGame>,
 }
 
@@ -350,47 +384,69 @@ pub struct MatchHistoryGames {
 #[serde(default, rename_all = "camelCase")]
 pub struct MatchHistoryGame {
     // epoch milliseconds.
+    #[serde(deserialize_with = "lenient")]
     pub game_creation: i64,
     // seconds.
+    #[serde(deserialize_with = "lenient")]
     pub game_duration: i64,
+    #[serde(deserialize_with = "lenient")]
     pub map_id: i64,
+    #[serde(deserialize_with = "lenient")]
+    pub queue_id: i64,
     // who each participant is. a player's own history can list only them.
+    #[serde(deserialize_with = "lenient")]
     pub participant_identities: Vec<ParticipantIdentity>,
+    #[serde(deserialize_with = "lenient")]
     pub participants: Vec<MatchParticipant>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ParticipantIdentity {
+    #[serde(deserialize_with = "lenient")]
     pub participant_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub player: ParticipantPlayer,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ParticipantPlayer {
+    #[serde(deserialize_with = "lenient")]
     pub puuid: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MatchParticipant {
+    #[serde(deserialize_with = "lenient")]
     pub participant_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub champion_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub spell1_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub spell2_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub stats: ParticipantStats,
+    #[serde(deserialize_with = "lenient")]
     pub timeline: ParticipantTimeline,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ParticipantStats {
+    #[serde(deserialize_with = "lenient")]
     pub win: bool,
+    #[serde(deserialize_with = "lenient")]
     pub kills: i64,
+    #[serde(deserialize_with = "lenient")]
     pub deaths: i64,
+    #[serde(deserialize_with = "lenient")]
     pub assists: i64,
+    #[serde(deserialize_with = "lenient")]
     pub total_minions_killed: i64,
+    #[serde(deserialize_with = "lenient")]
     pub neutral_minions_killed: i64,
 }
 
@@ -399,7 +455,9 @@ pub struct ParticipantStats {
 pub struct ParticipantTimeline {
     // what riot inferred: TOP, JUNGLE, MIDDLE, BOTTOM or NONE for the lane,
     // SOLO, DUO, DUO_CARRY, DUO_SUPPORT or NONE for the role.
+    #[serde(deserialize_with = "lenient")]
     pub lane: String,
+    #[serde(deserialize_with = "lenient")]
     pub role: String,
 }
 
@@ -408,19 +466,27 @@ pub struct ParticipantTimeline {
 #[serde(default, rename_all = "camelCase")]
 pub struct RankedStats {
     // the same entries twice: keyed by queue type, and as a list.
+    #[serde(deserialize_with = "lenient")]
     pub queue_map: HashMap<String, RankedQueue>,
+    #[serde(deserialize_with = "lenient")]
     pub queues: Vec<RankedQueue>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct RankedQueue {
+    #[serde(deserialize_with = "lenient")]
     pub queue_type: String,
     // "NONE" or empty while unranked.
+    #[serde(deserialize_with = "lenient")]
     pub tier: String,
+    #[serde(deserialize_with = "lenient")]
     pub division: String,
+    #[serde(deserialize_with = "lenient")]
     pub league_points: i64,
+    #[serde(deserialize_with = "lenient")]
     pub wins: i64,
+    #[serde(deserialize_with = "lenient")]
     pub losses: i64,
 }
 
@@ -450,7 +516,9 @@ impl RankedStats {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChampionMastery {
+    #[serde(deserialize_with = "lenient")]
     pub champion_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub champion_points: i64,
 }
 
@@ -882,6 +950,45 @@ mod tests {
             cache.get("a8d3f0c2-5e71-4b96-8c2d-e4f1a7b09c35", start),
             None
         );
+    }
+
+    #[test]
+    fn leaves_out_bots_customs_and_event_modes() {
+        let mut list = matches();
+        // the newest game, ranked in the fixture, becomes a game against bots,
+        // the next one an urf game.
+        let newest = list
+            .games
+            .games
+            .iter_mut()
+            .max_by_key(|game| game.game_creation)
+            .expect("the fixture has games");
+        newest.queue_id = 870;
+        let history = PlayerHistory::from_matches(&list, PUUID);
+        assert_eq!(champions(&history), [121, 412, 222, 103, 64]);
+        for game in &mut list.games.games {
+            game.queue_id = 1900;
+        }
+        assert!(PlayerHistory::from_matches(&list, PUUID).games.is_empty());
+    }
+
+    #[test]
+    fn tells_unranked_from_unknown() {
+        let ranked_without_solo = RankedStats {
+            queues: vec![RankedQueue {
+                queue_type: "RANKED_FLEX_SR".to_string(),
+                tier: "SILVER".to_string(),
+                ..RankedQueue::default()
+            }],
+            ..RankedStats::default()
+        };
+        let stats = PlayerStats::from_parts(None, Some(ranked_without_solo), None, None, PUUID);
+        assert_eq!((stats.rank.is_none(), stats.unranked), (true, true));
+        // the ranked request failed: nothing is known either way.
+        let stats = PlayerStats::from_parts(None, None, None, None, PUUID);
+        assert_eq!((stats.rank.is_none(), stats.unranked), (true, false));
+        let stats = PlayerStats::from_parts(None, Some(ranked()), None, None, PUUID);
+        assert_eq!((stats.rank.is_some(), stats.unranked), (true, false));
     }
 
     #[test]

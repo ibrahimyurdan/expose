@@ -10,16 +10,18 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::lenient::lenient;
+
 // ---- inbound: lcu summoner lookup ----
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summoner {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub game_name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub tag_line: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub summoner_level: i64,
 }
 
@@ -53,20 +55,23 @@ pub struct RegionLocale {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChatParticipants {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient")]
     pub participants: Vec<ChatParticipant>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+// every field is lenient: one participant with an odd field must not cost the
+// whole list, and with it every name in a ranked lobby.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
 pub struct ChatParticipant {
     // conversation id; the champ-select chat's cid contains "champ-select".
-    #[serde(default)]
+    #[serde(deserialize_with = "lenient")]
     pub cid: String,
-    #[serde(default)]
+    #[serde(deserialize_with = "lenient")]
     pub game_name: String,
-    #[serde(default)]
+    #[serde(deserialize_with = "lenient")]
     pub game_tag: String,
-    #[serde(default)]
+    #[serde(deserialize_with = "lenient")]
     pub puuid: String,
 }
 

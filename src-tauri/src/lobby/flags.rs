@@ -371,6 +371,7 @@ mod tests {
             game_name: Some("Sample Teammate".to_string()),
             tag_line: Some("NA1".to_string()),
             rank: Some(rank("GOLD")),
+            unranked: false,
             history: Some(PlayerHistory {
                 games: record("WLWLWLWLWLWLWLWLWLWL"),
             }),

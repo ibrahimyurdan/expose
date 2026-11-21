@@ -2,19 +2,29 @@
 // /lol-champ-select/v1/session, reduced to the fields the lobby reads. every
 // field defaults because the client omits or empties fields depending on the
 // queue and the phase: a hidden ranked teammate has no puuid and no name, a
-// blind pick slot has no position, and so on.
+// blind pick slot has no position, and so on. a field that arrives as null or
+// out of range takes its default as well (see lenient), so one odd value
+// never blanks the lobby.
 
 use serde::Deserialize;
+
+use crate::lenient::lenient;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Session {
     // a new lobby (a requeue after a dodge, say) gets a new game id.
+    #[serde(deserialize_with = "lenient")]
     pub game_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub queue_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub local_player_cell_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub my_team: Vec<SessionPlayer>,
+    #[serde(deserialize_with = "lenient")]
     pub timer: SessionTimer,
+    #[serde(deserialize_with = "lenient")]
     pub chat_details: ChatDetails,
     // theirTeam arrives with identities scrubbed by riot, so it is not read.
 }
@@ -24,23 +34,35 @@ pub struct Session {
 pub struct SessionPlayer {
     // the pick-order cell. a pick-order swap moves players between cells, so
     // the cell never tells players apart (see key).
+    #[serde(deserialize_with = "lenient")]
     pub cell_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub champion_id: i64,
     // the champion declared during planning, before a pick is locked in.
+    #[serde(deserialize_with = "lenient")]
     pub champion_pick_intent: i64,
+    #[serde(deserialize_with = "lenient")]
     pub spell1_id: i64,
+    #[serde(deserialize_with = "lenient")]
     pub spell2_id: i64,
     // "top", "jungle", "middle", "bottom" or "utility"; empty in blind pick.
+    #[serde(deserialize_with = "lenient")]
     pub assigned_position: String,
+    #[serde(deserialize_with = "lenient")]
     pub is_autofilled: bool,
     // empty (or zeroed) while the player is hidden.
+    #[serde(deserialize_with = "lenient")]
     pub puuid: String,
     // a per-lobby stand-in for the puuid, which hidden players still carry.
+    #[serde(deserialize_with = "lenient")]
     pub obfuscated_puuid: String,
+    #[serde(deserialize_with = "lenient")]
     pub game_name: String,
+    #[serde(deserialize_with = "lenient")]
     pub tag_line: String,
     // "HIDDEN" for an anonymous ranked teammate, "VISIBLE" or "UNHIDDEN" when
     // the name shows (yourself, a party member, a queue that hides nobody).
+    #[serde(deserialize_with = "lenient")]
     pub name_visibility_type: String,
 }
 
@@ -48,8 +70,10 @@ pub struct SessionPlayer {
 #[serde(default, rename_all = "camelCase")]
 pub struct SessionTimer {
     // PLANNING, BAN_PICK, FINALIZATION, and so on.
+    #[serde(deserialize_with = "lenient")]
     pub phase: String,
     // milliseconds remaining in the current phase.
+    #[serde(deserialize_with = "lenient")]
     pub adjusted_time_left_in_phase: i64,
 }
 
@@ -58,6 +82,7 @@ pub struct SessionTimer {
 pub struct ChatDetails {
     // the champ select chat room. the riot client's conversation id for the
     // same room contains it, which is how its chat participants are filtered.
+    #[serde(deserialize_with = "lenient")]
     pub multi_user_chat_id: String,
 }
 

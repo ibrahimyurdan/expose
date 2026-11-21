@@ -124,10 +124,7 @@ pub fn set_dodge_lead(app: AppHandle, state: State<AppState>, ms: i64) {
         let _ = store.save();
     }
     // an armed dodge already counting down moves to the new lead.
-    let session = state.lobby.lock().session.clone();
-    if let Some(session) = session {
-        dodge::on_session(&app, &session);
-    }
+    dodge::replan(&app);
     lobby::refresh(&app);
 }
 

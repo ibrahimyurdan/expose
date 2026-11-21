@@ -127,8 +127,11 @@ impl DodgeState {
 
     // what a session means for the armed dodge: a session from another lobby
     // disarms it, and a lobby locking in says how long to wait before firing.
-    // none when there is nothing to schedule.
-    fn plan(&self, session: &Session) -> Option<Duration> {
+    // the client sends no timer ticks, so a session can be old by the time it
+    // is planned from (armed seconds after the last update, say): its timer
+    // counts from when it arrived, which was `age` ago. none when there is
+    // nothing to schedule.
+    fn plan(&self, session: &Session, age: Duration) -> Option<Duration> {
         let armed = *self.armed_game.lock();
         match armed {
             None => return None,
@@ -139,7 +142,11 @@ impl DodgeState {
             Some(_) => {}
         }
         let phase = session.timer.phase.as_str();
-        let left = session.timer.adjusted_time_left_in_phase;
+        let age_ms = i64::try_from(age.as_millis()).unwrap_or(i64::MAX);
+        let left = session
+            .timer
+            .adjusted_time_left_in_phase
+            .saturating_sub(age_ms);
         let lead = self.lead_ms();
         if should_fire(phase, left, lead) {
             // armed with less than the lead left: go now.
@@ -186,11 +193,24 @@ pub async fn dodge_now(app: &AppHandle) -> Result<(), String> {
 // arms the last-second dodge for the lobby with this game id. a lobby that is
 // already locking in gets its timer straight away.
 pub fn arm(app: &AppHandle, game_id: i64) {
-    let state = app.state::<AppState>();
-    state.dodge.arm(game_id);
-    let session = state.lobby.lock().session.clone();
-    if let Some(session) = session {
-        on_session(app, &session);
+    app.state::<AppState>().dodge.arm(game_id);
+    replan(app);
+}
+
+// plans the armed dodge again from the latest session, counting the time since
+// it arrived: after arming, and after the lead time changes.
+pub fn replan(app: &AppHandle) {
+    let latest = {
+        let state = app.state::<AppState>();
+        let lobby = state.lobby.lock();
+        lobby
+            .session
+            .clone()
+            .map(|session| (session, lobby.session_at))
+    };
+    if let Some((session, arrived)) = latest {
+        let age = arrived.map_or(Duration::ZERO, |at| at.elapsed());
+        on_session(app, &session, age);
     }
 }
 
@@ -198,11 +218,12 @@ pub fn disarm(app: &AppHandle) {
     app.state::<AppState>().dodge.disarm();
 }
 
-// called with every champ select session. while armed for this lobby and
-// locking in, it (re)schedules the one dodge timer from the session's timer.
-pub fn on_session(app: &AppHandle, session: &Session) {
+// called with every champ select session, `age` after it arrived (nothing for
+// one that just did). while armed for this lobby and locking in, it
+// (re)schedules the one dodge timer from the session's timer.
+pub fn on_session(app: &AppHandle, session: &Session, age: Duration) {
     let state = app.state::<AppState>();
-    let Some(delay) = state.dodge.plan(session) else {
+    let Some(delay) = state.dodge.plan(session, age) else {
         return;
     };
     let game_id = session.game_id;
@@ -303,7 +324,10 @@ mod tests {
     fn schedules_once_the_lobby_locks_in() {
         let dodge = DodgeState::default();
         // not armed: nothing to schedule, whatever the phase.
-        assert_eq!(dodge.plan(&session(1, "FINALIZATION", 9_000)), None);
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 9_000), Duration::ZERO),
+            None
+        );
 
         dodge.arm(1);
         assert_eq!(
@@ -316,27 +340,60 @@ mod tests {
         // armed for this lobby only.
         assert!(!dodge.view(2).armed);
         // picks and bans: wait for finalization.
-        assert_eq!(dodge.plan(&session(1, "BAN_PICK", 20_000)), None);
+        assert_eq!(
+            dodge.plan(&session(1, "BAN_PICK", 20_000), Duration::ZERO),
+            None
+        );
         assert!(dodge.view(1).armed);
         // locking in: fire when the timer reaches the lead.
         assert_eq!(
-            dodge.plan(&session(1, "FINALIZATION", 9_000)),
+            dodge.plan(&session(1, "FINALIZATION", 9_000), Duration::ZERO),
             Some(Duration::from_millis(7_500))
         );
         // armed with less than the lead left: right away.
         assert_eq!(
-            dodge.plan(&session(1, "FINALIZATION", 1_000)),
+            dodge.plan(&session(1, "FINALIZATION", 1_000), Duration::ZERO),
             Some(Duration::ZERO)
         );
         // the lead follows the setting.
         dodge.set_lead_ms(3_000);
         assert_eq!(
-            dodge.plan(&session(1, "FINALIZATION", 9_000)),
+            dodge.plan(&session(1, "FINALIZATION", 9_000), Duration::ZERO),
             Some(Duration::from_millis(6_000))
         );
         dodge.disarm();
         assert!(!dodge.view(1).armed);
-        assert_eq!(dodge.plan(&session(1, "FINALIZATION", 9_000)), None);
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 9_000), Duration::ZERO),
+            None
+        );
+    }
+
+    #[test]
+    fn counts_the_time_since_the_session_arrived() {
+        let dodge = DodgeState::default();
+        dodge.arm(1);
+        // locking in with 30 s left, armed 20 s after that session came: 10 s
+        // are really left, so the dodge is 8.5 s away, not 28.5 s.
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 30_000), Duration::from_secs(20)),
+            Some(Duration::from_millis(8_500))
+        );
+        // so old that the lead has already passed: right away.
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 30_000), Duration::from_secs(29)),
+            Some(Duration::ZERO)
+        );
+        // an absurd age does not overflow.
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 30_000), Duration::MAX),
+            Some(Duration::ZERO)
+        );
+        // picks and bans still never schedule, however old.
+        assert_eq!(
+            dodge.plan(&session(1, "BAN_PICK", 30_000), Duration::from_secs(29)),
+            None
+        );
     }
 
     // a timer that never goes off by itself, and the generation it was given.
@@ -372,13 +429,19 @@ mod tests {
         assert!(dodge.has_timer());
 
         // a session from another lobby: disarmed, timer aborted, nothing new.
-        assert_eq!(dodge.plan(&session(2, "FINALIZATION", 9_000)), None);
+        assert_eq!(
+            dodge.plan(&session(2, "FINALIZATION", 9_000), Duration::ZERO),
+            None
+        );
         assert!(!dodge.view(1).armed);
         assert!(!dodge.view(2).armed);
         assert!(!dodge.has_timer());
         assert!(aborted(gone), "the timer task should be aborted");
         // and lobby 1 coming back later does not re-arm it.
-        assert_eq!(dodge.plan(&session(1, "FINALIZATION", 9_000)), None);
+        assert_eq!(
+            dodge.plan(&session(1, "FINALIZATION", 9_000), Duration::ZERO),
+            None
+        );
     }
 
     #[test]
@@ -414,7 +477,10 @@ mod tests {
         // a cancelled timer gives up too: the lobby moved past locking in.
         dodge.arm(4);
         let (third, third_gone) = watched_timer(&dodge);
-        assert_eq!(dodge.plan(&session(4, "GAME_STARTING", 0)), None);
+        assert_eq!(
+            dodge.plan(&session(4, "GAME_STARTING", 0), Duration::ZERO),
+            None
+        );
         assert!(!dodge.has_timer());
         assert!(aborted(third_gone), "the cancelled timer should be aborted");
         assert!(!dodge.take_armed(4, third));

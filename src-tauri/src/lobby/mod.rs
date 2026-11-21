@@ -14,6 +14,7 @@ pub mod view;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
@@ -32,18 +33,24 @@ use identity::{
     SlotHint,
 };
 use session::{is_blank, Session, SessionPlayer};
-use stats::{fetch_stats, PlayerStats, Position, StatsCache};
+use stats::{fetch_stats, Fetched, PlayerStats, Position, StatsCache};
 use view::{build_view, LobbyView, ScoutContext};
 
 // while a hidden teammate has no exact match, the riot client's chat is read
 // again at most this often.
 const CHAT_EVERY: Duration = Duration::from_secs(2);
+// reads of an empty chat (the riot client joins the room a moment after champ
+// select starts) before a hidden slot stops showing as being matched.
+const CHAT_PATIENCE: u32 = 5;
 // any champ select chat room has this in its conversation id.
 const CHAMP_SELECT_ROOM: &str = "champ-select";
 // what the toast says when the names in a ranked lobby cannot be read.
 const CHAT_UNAVAILABLE: &str = "Couldn't reach the Riot client, so ranked names may stay hidden.";
 // stats requests to the league client in flight at once, across all players.
 static STATS_REQUESTS: Semaphore = Semaphore::const_new(4);
+// the last reason a session could not be read, so the log says it once rather
+// than for every event of the lobby.
+static SESSION_ERROR: Mutex<String> = Mutex::new(String::new());
 
 // everything expose knows about the lobby it is in. reset whenever a session
 // belongs to another lobby, so nothing of the last one leaks into the next.
@@ -59,10 +66,24 @@ pub struct LobbyState {
     pub stats: HashMap<String, PlayerStats>,
     // puuids whose stats are being fetched.
     pub pending: HashSet<String>,
-    // when the chat was last read.
+    // the names came from this lobby's own chat room, not the champ select
+    // fallback (see lobby_candidates).
+    pub candidates_from_room: bool,
+    // hidden players the scramble key rules out of the chat (see Resolved).
+    pub absent: HashSet<String>,
+    // hidden slots still being matched: the chat has not answered yet, or a
+    // guess waits for a name's stats.
+    pub matching: HashSet<String>,
+    // when the chat was last read, and how it went.
     pub participants_fetched_at: Option<Instant>,
-    // the latest session, for the views rebuilt as stats arrive.
+    pub chat_reads: u32,
+    pub chat_failed: bool,
+    // a chat reader runs for this lobby (see read_chat).
+    pub chat_reading: bool,
+    // the latest session, for the views rebuilt as stats arrive, and when it
+    // arrived: the client sends no timer ticks, so its timer ages from then.
     pub session: Option<Session>,
+    pub session_at: Option<Instant>,
     // the match counts last written to the log.
     pub logged_summary: String,
     // the scout site was opened for this lobby.
@@ -100,8 +121,12 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
         return;
     }
 
-    let Ok(session) = serde_json::from_value::<Session>(data) else {
-        return;
+    let session = match serde_json::from_value::<Session>(data) {
+        Ok(session) => session,
+        Err(error) => {
+            session_unreadable(&error.to_string());
+            return;
+        }
     };
     // a transitional create/update can arrive with an empty team and no phase
     // before champ select is really underway. ignore it so the window does not
@@ -120,43 +145,44 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
     }
 
     let reveal = state.reveal_ranked.load(Ordering::Relaxed);
-    let read_chat = {
+    let start_reader = {
         let mut lobby = state.lobby.lock();
         lobby.enter(session.game_id);
         lobby.session = Some(session.clone());
+        lobby.session_at = Some(Instant::now());
         resolve(&mut lobby, reveal);
-        let now = Instant::now();
-        let due = reveal && chat_due(&lobby, now);
-        if due {
-            lobby.participants_fetched_at = Some(now);
+        let start = reveal && !lobby.chat_reading && chat_due(&lobby, Instant::now());
+        if start {
+            lobby.chat_reading = true;
         }
-        due
+        start
     };
     // an armed last-second dodge follows the lobby's timer.
-    dodge::on_session(app, &session);
+    dodge::on_session(app, &session, Duration::ZERO);
     // slots, aliases and whatever is already known show straight away; the
     // chat can only add to them.
     update(app, client);
-
-    if read_chat {
-        if let Some(candidates) = read_chat_names(app, &session).await {
-            let changed = {
-                let mut lobby = state.lobby.lock();
-                // an empty read keeps the names already known for this lobby.
-                let fresh = lobby.game_id == session.game_id
-                    && !candidates.is_empty()
-                    && lobby.candidates != candidates;
-                if fresh {
-                    lobby.candidates = candidates;
-                }
-                fresh
-            };
-            if changed {
-                update(app, client);
-            }
-        }
+    if start_reader {
+        let app = app.clone();
+        let client = client.clone();
+        let game_id = session.game_id;
+        tauri::async_runtime::spawn(async move {
+            read_chat(&app, &client, game_id).await;
+        });
     }
     auto_open(app);
+}
+
+// the session could not be read, so this event changes nothing. said once per
+// reason; serde's message names the expected type, never a player.
+fn session_unreadable(reason: &str) {
+    let mut last = SESSION_ERROR
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if *last != reason {
+        log::warn!("could not read the champ select session: {reason}");
+        reason.clone_into(&mut last);
+    }
 }
 
 // the league client went away or champ select ended: disarm the last-second
@@ -213,21 +239,26 @@ fn update(app: &AppHandle, client: &LcuClient) {
         let app = app.clone();
         let client = client.clone();
         tauri::async_runtime::spawn(async move {
-            let stats = fetch_stats(&client, &puuid, &STATS_REQUESTS).await;
-            stats_arrived(&app, game_id, puuid, stats);
+            let fetched = fetch_stats(&client, &puuid, &STATS_REQUESTS).await;
+            stats_arrived(&app, game_id, puuid, fetched);
         });
     }
     publish(app);
 }
 
 // one player's stats are in: keep them, guess again if that was the last
-// name a guess waited for, and show them.
-fn stats_arrived(app: &AppHandle, game_id: i64, puuid: String, stats: PlayerStats) {
+// name a guess waited for, and show them. only a fetch where every request
+// went through is reused in later lobbies; one with a gap stays in this lobby
+// alone, so a passing failure is not shown for the next ten minutes.
+fn stats_arrived(app: &AppHandle, game_id: i64, puuid: String, fetched: Fetched) {
+    let Fetched { stats, complete } = fetched;
     let state = app.state::<AppState>();
-    state
-        .stats_cache
-        .lock()
-        .insert(puuid.clone(), stats.clone(), Instant::now());
+    if complete {
+        state
+            .stats_cache
+            .lock()
+            .insert(puuid.clone(), stats.clone(), Instant::now());
+    }
     let reveal = state.reveal_ranked.load(Ordering::Relaxed);
     {
         let mut lobby = state.lobby.lock();
@@ -284,14 +315,18 @@ fn publish(app: &AppHandle) {
 // works out who sits in each slot: the exact steps first, then a guess for
 // the hidden slots still open, once every name left over has stats to guess
 // from. an exact match always wins, since the guess only gets what the exact
-// steps leave. with ranked reveal off, the chat is forgotten and hidden
-// players stay hidden.
+// steps leave. while a new name's stats are on the way the last guess stands,
+// so rows do not blink as names trickle in. with ranked reveal off, the chat
+// is forgotten and hidden players stay hidden.
 fn resolve(lobby: &mut LobbyState, reveal: bool) {
     if !reveal {
         lobby.candidates.clear();
+        lobby.candidates_from_room = false;
     }
     let Some(session) = &lobby.session else {
         lobby.identities.clear();
+        lobby.absent.clear();
+        lobby.matching.clear();
         return;
     };
     let Resolved {
@@ -323,10 +358,44 @@ fn resolve(lobby: &mut LobbyState, reveal: bool) {
             Some((candidate.clone(), stats.clone()))
         })
         .collect();
-    if let Some(names) = names {
-        identities.extend(guess(&open, &names));
+    let waiting = names.is_none();
+    match names {
+        Some(names) => identities.extend(guess(&open, &names)),
+        None => {
+            let listed: HashSet<&str> = lobby
+                .candidates
+                .iter()
+                .map(|candidate| candidate.puuid.as_str())
+                .collect();
+            for slot in &open {
+                let last = lobby
+                    .identities
+                    .get(&slot.key)
+                    .filter(|last| last.kind == MatchKind::Guess)
+                    .filter(|last| {
+                        canonical_puuid(&last.puuid).is_some_and(|puuid| {
+                            listed.contains(puuid.as_str()) && !used.contains(&puuid)
+                        })
+                    });
+                if let Some(last) = last {
+                    identities.insert(slot.key.clone(), last.clone());
+                }
+            }
+        }
     }
+    // the chat has not named anyone yet but may still, or a guess is waiting.
+    let names_due =
+        lobby.candidates.is_empty() && !lobby.chat_failed && lobby.chat_reads < CHAT_PATIENCE;
+    lobby.matching = if reveal && (names_due || waiting) {
+        open.iter()
+            .map(|slot| slot.key.clone())
+            .filter(|key| !identities.contains_key(key))
+            .collect()
+    } else {
+        HashSet::new()
+    };
     lobby.identities = identities;
+    lobby.absent = absent;
 }
 
 fn slot_hint(player: &SessionPlayer) -> SlotHint {
@@ -342,10 +411,17 @@ fn slot_hint(player: &SessionPlayer) -> SlotHint {
 // the chat is worth reading while a hidden teammate has no exact match (a
 // guess may still turn exact), at most every couple of seconds.
 fn chat_due(lobby: &LobbyState, now: Instant) -> bool {
+    let rested = lobby
+        .participants_fetched_at
+        .is_none_or(|at| now.saturating_duration_since(at) >= CHAT_EVERY);
+    needs_chat(lobby) && rested
+}
+
+fn needs_chat(lobby: &LobbyState) -> bool {
     let Some(session) = &lobby.session else {
         return false;
     };
-    let unmatched = session
+    session
         .my_team
         .iter()
         .filter(|player| player.is_hidden())
@@ -354,26 +430,118 @@ fn chat_due(lobby: &LobbyState, now: Instant) -> bool {
                 .identities
                 .get(&player.key())
                 .is_none_or(|identity| identity.kind == MatchKind::Guess)
-        });
-    let rested = lobby
-        .participants_fetched_at
-        .is_none_or(|at| now.saturating_duration_since(at) >= CHAT_EVERY);
-    unmatched && rested
+        })
 }
 
-// the names in this lobby's chat as the riot client lists them, or none when
-// the chat could not be read (which the player hears about once per lobby).
-async fn read_chat_names(app: &AppHandle, session: &Session) -> Option<Vec<Candidate>> {
+// reads the lobby's chat names every couple of seconds while a hidden teammate
+// has no exact match. one reader runs per lobby, off the league client's event
+// loop, so a slow riot client never holds up champ select events.
+async fn read_chat(app: &AppHandle, client: &LcuClient, game_id: i64) {
+    loop {
+        let chat_id = {
+            let state = app.state::<AppState>();
+            let lobby = state.lobby.lock();
+            if lobby.game_id != game_id {
+                return;
+            }
+            lobby
+                .session
+                .as_ref()
+                .map(|session| session.chat_details.multi_user_chat_id.clone())
+                .unwrap_or_default()
+        };
+        let read = read_chat_names(app, &chat_id).await;
+        if !chat_arrived(app, client, game_id, read) {
+            return;
+        }
+        tokio::time::sleep(CHAT_EVERY).await;
+    }
+}
+
+// one chat read is back: add its names to the lobby and show what changed.
+// true while another read is worth it.
+fn chat_arrived(
+    app: &AppHandle,
+    client: &LcuClient,
+    game_id: i64,
+    read: Option<(Vec<Candidate>, bool)>,
+) -> bool {
+    let state = app.state::<AppState>();
+    let reveal = state.reveal_ranked.load(Ordering::Relaxed);
+    let (changed, again) = {
+        let mut lobby = state.lobby.lock();
+        // the lobby is over; the next one runs its own reader.
+        if lobby.game_id != game_id {
+            return false;
+        }
+        lobby.participants_fetched_at = Some(Instant::now());
+        let before = lobby.matching.clone();
+        let mut changed = false;
+        if reveal {
+            match read {
+                Some((names, from_room)) => {
+                    lobby.chat_failed = false;
+                    lobby.chat_reads = lobby.chat_reads.saturating_add(1);
+                    changed = merge_candidates(&mut lobby, names, from_room);
+                }
+                None => lobby.chat_failed = true,
+            }
+        }
+        resolve(&mut lobby, reveal);
+        changed |= lobby.matching != before;
+        let again = reveal && needs_chat(&lobby);
+        if !again {
+            lobby.chat_reading = false;
+        }
+        (changed, again)
+    };
+    if changed {
+        update(app, client);
+        auto_open(app);
+    }
+    again
+}
+
+// adds a read's names to the lobby's, and true when that changed them. names
+// stay once seen: a player dropping out of one read (a presence flap) must not
+// undo an exact match. the lobby's own room outranks the champ select fallback,
+// whose names may come from an older lobby, so the first read that finds the
+// room replaces them.
+fn merge_candidates(lobby: &mut LobbyState, names: Vec<Candidate>, from_room: bool) -> bool {
+    if names.is_empty() || (lobby.candidates_from_room && !from_room) {
+        return false;
+    }
+    if from_room && !lobby.candidates_from_room {
+        lobby.candidates_from_room = true;
+        let changed = lobby.candidates != names;
+        lobby.candidates = names;
+        return changed;
+    }
+    let mut changed = false;
+    for name in names {
+        if !lobby
+            .candidates
+            .iter()
+            .any(|known| known.puuid == name.puuid)
+        {
+            lobby.candidates.push(name);
+            changed = true;
+        }
+    }
+    changed
+}
+
+// the names in this lobby's chat as the riot client lists them, and whether
+// they came from the lobby's own room; none when the chat could not be read
+// (which the player hears about once per lobby).
+async fn read_chat_names(app: &AppHandle, chat_id: &str) -> Option<(Vec<Candidate>, bool)> {
     let riot = app.state::<AppState>().riot_client.read().clone();
     let Some(riot) = riot else {
         chat_unavailable(app, "the riot client was not found");
         return None;
     };
     match riot.chat_participants().await {
-        Ok(participants) => Some(lobby_candidates(
-            &participants,
-            &session.chat_details.multi_user_chat_id,
-        )),
+        Ok(participants) => Some(lobby_candidates(&participants, chat_id)),
         Err(error) => {
             chat_unavailable(app, &error.to_string());
             None
@@ -393,11 +561,12 @@ fn chat_unavailable(app: &AppHandle, reason: &str) {
     }
 }
 
-// the chat participants in this lobby's champ select room, once each. the
-// room is the conversation whose id holds the session's chat id, or any champ
-// select room when none does. a participant without a name or a real puuid is
-// left out, since the riot client is not showing who they are.
-fn lobby_candidates(participants: &[ChatParticipant], chat_id: &str) -> Vec<Candidate> {
+// the chat participants in this lobby's champ select room, once each, and
+// true when that room was found. the room is the conversation whose id holds
+// the session's chat id, or any champ select room when none does. a
+// participant without a name or a real puuid is left out, since the riot
+// client is not showing who they are.
+fn lobby_candidates(participants: &[ChatParticipant], chat_id: &str) -> (Vec<Candidate>, bool) {
     let lobby_room = !chat_id.is_empty()
         && participants
             .iter()
@@ -408,7 +577,7 @@ fn lobby_candidates(participants: &[ChatParticipant], chat_id: &str) -> Vec<Cand
         CHAMP_SELECT_ROOM
     };
     let mut seen = HashSet::new();
-    participants
+    let names = participants
         .iter()
         .filter(|participant| participant.cid.contains(room))
         .filter(|participant| !participant.game_name.is_empty() && !is_blank(&participant.puuid))
@@ -420,7 +589,8 @@ fn lobby_candidates(participants: &[ChatParticipant], chat_id: &str) -> Vec<Cand
             })
         })
         .filter(|candidate| seen.insert(candidate.puuid.clone()))
-        .collect()
+        .collect();
+    (names, lobby_room)
 }
 
 // moves cached stats into the lobby for every matched player and every chat
@@ -669,17 +839,21 @@ mod tests {
             participant("friend@pvp.net", REAL[3], "Friend"),
             participant("c1~0ld@champ-select.na1.pvp.net", STRANGER, "Stranger"),
         ];
-        // one entry per player, puuids written the one way.
+        // one entry per player, puuids written the one way, from the room.
         assert_eq!(
             lobby_candidates(&participants, chat_id),
-            [
-                candidate(REAL[0], "Name One"),
-                candidate(REAL[1], "Name Two")
-            ]
+            (
+                vec![
+                    candidate(REAL[0], "Name One"),
+                    candidate(REAL[1], "Name Two")
+                ],
+                true
+            )
         );
 
         // when no room carries the chat id, any champ select room does.
-        let names = |candidates: Vec<Candidate>| -> Vec<String> {
+        let names = |(candidates, from_room): (Vec<Candidate>, bool)| -> Vec<String> {
+            assert!(!from_room, "the lobby's room is not in this read");
             candidates
                 .into_iter()
                 .map(|candidate| candidate.game_name)
@@ -693,7 +867,7 @@ mod tests {
             names(lobby_candidates(&participants, "")),
             ["Name One", "Name Two", "Stranger"]
         );
-        assert!(lobby_candidates(&[], chat_id).is_empty());
+        assert!(lobby_candidates(&[], chat_id).0.is_empty());
     }
 
     #[test]
@@ -797,6 +971,123 @@ mod tests {
             ]
         );
         assert_eq!(names(&state)[3], Some("Name Three"));
+        // so the support's row says the name stays hidden.
+        let support = state
+            .session
+            .as_ref()
+            .expect("a session")
+            .team_in_slot_order()[4]
+            .key();
+        assert_eq!(state.absent, HashSet::from([support]));
+        assert!(state.matching.is_empty());
+    }
+
+    #[test]
+    fn keeps_the_last_guess_while_a_new_name_loads() {
+        let mut state = lobby(ranked());
+        state.candidates = vec![
+            candidate(REAL[0], "Jungle Main"),
+            candidate(REAL[1], "Top Main"),
+        ];
+        state
+            .stats
+            .insert(REAL[0].to_string(), played(Position::Jungle, 64, (11, 4)));
+        state
+            .stats
+            .insert(REAL[1].to_string(), played(Position::Top, 266, (12, 4)));
+        resolve(&mut state, true);
+        let owned = |state: &LobbyState| -> Vec<Option<String>> {
+            names(state)
+                .into_iter()
+                .map(|name| name.map(str::to_string))
+                .collect()
+        };
+        let guessed = owned(&state);
+        assert_eq!(guessed[0].as_deref(), Some("Top Main"));
+        assert_eq!(guessed[1].as_deref(), Some("Jungle Main"));
+
+        // a third name shows up in the chat; its stats are on the way. the
+        // guess stands meanwhile, and only the open slots show as matching.
+        state.candidates.push(candidate(REAL[2], "Bot Main"));
+        resolve(&mut state, true);
+        assert_eq!(owned(&state), guessed);
+        let open: HashSet<String> = [BOTTOM, SUPPORT].map(String::from).into();
+        assert_eq!(state.matching, open);
+
+        // the stats arrive: everyone is guessed again, and nothing is pending.
+        state
+            .stats
+            .insert(REAL[2].to_string(), played(Position::Bottom, 222, (7, 4)));
+        resolve(&mut state, true);
+        assert_eq!(names(&state)[3], Some("Bot Main"));
+        assert!(state.matching.is_empty());
+    }
+
+    #[test]
+    fn shows_matching_until_there_is_nothing_left_to_try() {
+        let hidden: HashSet<String> = [TOP, JUNGLE, BOTTOM, SUPPORT].map(String::from).into();
+        let mut state = lobby(ranked());
+        // champ select just started and the chat has not been read.
+        resolve(&mut state, true);
+        assert_eq!(state.matching, hidden);
+        // with ranked reveal off nothing is being matched.
+        resolve(&mut state, false);
+        assert!(state.matching.is_empty());
+
+        // empty reads while the riot client joins the room: still matching,
+        // until it has had its chances.
+        state.chat_reads = CHAT_PATIENCE - 1;
+        resolve(&mut state, true);
+        assert_eq!(state.matching, hidden);
+        state.chat_reads = CHAT_PATIENCE;
+        resolve(&mut state, true);
+        assert!(state.matching.is_empty());
+
+        // a failed read gives up at once (the player gets a toast).
+        state.chat_reads = 0;
+        state.chat_failed = true;
+        resolve(&mut state, true);
+        assert!(state.matching.is_empty());
+    }
+
+    #[test]
+    fn chat_names_stay_once_seen() {
+        let mut state = lobby(ranked());
+        // the champ select fallback found a room, maybe an older lobby's.
+        let stray = vec![candidate(STRANGER, "Stranger")];
+        assert!(merge_candidates(&mut state, stray, false));
+        // the lobby's own room replaces those names.
+        let room = vec![
+            candidate(REAL[0], "Name One"),
+            candidate(REAL[1], "Name Two"),
+        ];
+        assert!(merge_candidates(&mut state, room.clone(), true));
+        assert_eq!(state.candidates, room);
+        // a read missing a player (a presence flap) keeps them.
+        assert!(!merge_candidates(
+            &mut state,
+            vec![candidate(REAL[0], "Name One")],
+            true
+        ));
+        assert_eq!(state.candidates, room);
+        // a newcomer is added, an empty read and the fallback change nothing.
+        assert!(merge_candidates(
+            &mut state,
+            vec![candidate(REAL[2], "Name Three")],
+            true
+        ));
+        assert!(!merge_candidates(&mut state, Vec::new(), true));
+        assert!(!merge_candidates(
+            &mut state,
+            vec![candidate(STRANGER, "Stranger")],
+            false
+        ));
+        let listed: Vec<&str> = state
+            .candidates
+            .iter()
+            .map(|candidate| candidate.game_name.as_str())
+            .collect();
+        assert_eq!(listed, ["Name One", "Name Two", "Name Three"]);
     }
 
     #[test]
