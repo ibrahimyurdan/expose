@@ -1,30 +1,55 @@
 # expose
 
-a small companion for the league of legends client. it does three things:
+a small companion for the league of legends client that helps you spot a troll lobby before the game starts. it does three things:
 
-- **shows your teammates** during champ select. in ranked, the client hides teammate names (anonymous champ select); expose surfaces them anyway.
+- **scouts your team** during champ select: each teammate's rank, recent games, kda and experience on their champion, with red flags (autofilled, a loss streak, a first-time champion, a bad kda, signs of a bought account) and a one-line verdict for the whole team. in ranked solo/duo it also tells you who is behind "gromp", "murk wolf" and the other hidden names.
 - **auto-accepts queue ready checks**, with a toggle you can turn off.
-- **dodges champ select** with one click, so you can bail a lobby without force-quitting the whole client.
+- **dodges champ select** with two clicks, or by itself just before the lobby locks in, so you can leave a lobby without force-quitting the whole client.
 
-on macos it lives in the dock; on windows in the notification area. no account login and no in-game overlay.
+on macos it lives in the dock; on windows in the notification area. no account login, no riot api key, no server of its own and no in-game overlay: everything comes from the league and riot clients on your own computer.
 
 ## risk & terms of use
 
 expose talks to riot's local **lcu** and **riot client** apis. these are unofficial and unsupported — riot can change or remove them at any time, and using them is not endorsed.
 
-the ranked teammates feature is the part to weigh. anonymous champ select hides teammate names on purpose; expose recovers them from a separate local api that still reports them, so it defeats a deliberate riot feature. that is a stronger terms-of-use concern than auto-accept or dodge and may carry some account risk. it is on by default and can be turned off under settings → **reveal in ranked**. auto-accept and dodge are ordinary client conveniences, but are still automation of client actions.
+the ranked teammates feature is the part to weigh. anonymous champ select hides teammate names on purpose; expose recovers them from a separate local api that still reports them, and matches them to their slots, so it defeats a deliberate riot feature. that is a stronger terms-of-use concern than auto-accept or dodge and may carry some account risk. it is on by default and can be turned off under settings → **reveal and match ranked teammates**. auto-accept and dodge are ordinary client conveniences, but are still automation of client actions.
 
 there is no way to know riot's enforcement intent for certain. **use expose at your own risk.**
 
 ## features in detail
 
-**teammates.** in normal, draft, and bot games the champ-select session carries real puuids, so expose shows a full card per teammate: role, current champion, level, and a region-correct op.gg link. in ranked, riot's anonymous champ select strips identities from that session, so expose instead reads the riot client chat service (a separate local api that still knows who is who) and surfaces each teammate's name and op.gg link — names only, because the chat gives no way to map a name back to a champ-select cell (so no role or champion). enemy identities are never available (riot zeroes them) and are out of scope. a **scout all** button opens every teammate on op.gg at once via a multi-search.
+**champ select.** when champ select starts, expose comes forward with one row per player, you included, in pick order:
+
+- the slot: champion, role, and the hidden name in ranked ("gromp", "krug", …) or the riot id elsewhere.
+- who they are: the riot id behind a hidden name, marked exact or "likely".
+- their solo/duo rank, the last 10 results as dots, kda, and games and mastery on the champion they picked.
+- red flags in red (strong) and amber (mild), or a quiet "looks fine". click a row for the last 10 games, the role split, level and season record, and a link to op.gg or u.gg.
+
+above the rows, a summary card reads the whole team ("3 red flags on 2 teammates", "no red flags") and holds the dodge controls. it never sounds surer than the data: while names or stats are still loading it says so, and a teammate whose match history could not be loaded does not count toward an all-clear. a **scout** button opens your whole team on op.gg or u.gg at once.
+
+the flags, from the last 20 summoner's rift games in ranked and normal queues:
+
+| flag | when |
+| --- | --- |
+| autofilled | the slot is autofilled, or (with 8 or more games) the role is not one of the player's two most played |
+| lost last n | 3 or more losses in a row |
+| first time on a champion | no mastery and no recent games on it |
+| new to a champion (mild) | under 10,000 mastery and no recent games on it |
+| low win rate (mild) | under 40% over at least 10 games |
+| bad kda (mild) | under 1.5 over the last 10 games (at least 5) |
+| on tilt (mild) | 5 or more games in the last 6 hours with more losses than wins |
+| fresh account (mild) | under level 60 while ranked gold or above, so possibly bought or boosted |
+| no match history | the client did not return one |
+
+**ranked matching.** riot scrambles each hidden teammate's id with one key per lobby; expose works that key out from the names the riot client already lists and only accepts it when it fits at least three teammates and nothing else fits as well, so those matches are exact. whoever is left is matched by elimination, or guessed from their recent roles, summoner spells and champions and marked "likely" with a confidence. a player the riot client itself does not list (for example riot's streamer mode) is never revealed. enemy identities are never available (riot zeroes them) and are out of scope.
 
 **auto-accept.** when a ready check pops and the toggle is on, expose accepts it. the toggle state is saved between launches.
 
-**dodge.** a dodge button appears during champ select. it takes two clicks (arm, then confirm, with a visible 3 second disarm timer) so it can't fire by accident, and leaves champ select through the client api without closing the client. the normal dodge penalty (lp loss, queue lockout) still applies; expose only saves you the force-quit.
+**dodge.** the dodge button takes two clicks (arm, then confirm within 3 seconds) so it can't fire by accident, and leaves champ select through the client api without closing the client. the **last second** switch arms a dodge for the current lobby that fires when the final countdown reaches 1.5 seconds (1 to 3, in settings), with a visible countdown; it disarms itself when the lobby changes or ends. the normal dodge penalty (lp loss, queue lockout) still applies; expose only saves you the force-quit.
 
-**settings.** a gear in the header opens settings: pick the scout site (op.gg, u.gg, deeplol, or tracker), auto-open the scout multi-search when champ select begins, toggle reveal-in-ranked, and launch expose at login. failures (an unreachable riot client, a dodge that could not fire) surface as a brief in-app notice rather than failing silently.
+**settings.** a gear in the header opens settings: launch at login, auto-accept, reveal and match ranked teammates, auto-open the scout site when champ select begins, the scout site (op.gg or u.gg), the last-second lead time, the version with an update link, and a button that opens the logs folder. failures (an unreachable riot client, a dodge that could not fire) surface as a brief notice rather than failing silently.
+
+the window is 460 by 680 by default, can be resized down to 420 by 600, and remembers its size and position.
 
 see [scope](#scope) below for what is intentionally left out.
 
@@ -85,7 +110,7 @@ without these secrets the workflow still runs and ships an unsigned build. an in
 
 the rust backend connects to two local apis: the **league client** (lcu) for champ select, matchmaking, and dodging, and the **riot client** for the chat service that still reports real names during anonymous ranked champ select. each advertises a random port and an auth token via a lockfile and the league process command line; expose finds them either way (on windows it also reads riot's install metadata, so league can live on any drive) and connects over the self-signed https and websocket endpoints (accepted only because the host is always 127.0.0.1).
 
-a single supervisor task owns the connection lifecycle: it detects the client (a 2 second poll plus a file watcher on the lockfile directory), subscribes to two events, dispatches them to the features, and reconnects when the client comes and goes.
+a single supervisor task owns the connection lifecycle: it detects the client (a 2 second poll plus a file watcher on the lockfile directory), subscribes to two events, dispatches them to the features, and reconnects when the client comes and goes. every champ select update rebuilds one lobby view, which goes to the frontend at once and again as each player's stats arrive (four requests per player, at most four at a time, reused for ten minutes). the log records which matching step placed each ranked teammate, never their names or ids.
 
 ```
 src-tauri/src/
@@ -103,16 +128,29 @@ src-tauri/src/
     client.rs        https client (league client and riot client chat)
     websocket.rs     event subscription and parsing
     mod.rs           connection supervisor (poll, heartbeat, reconnect)
+  lenient.rs         tolerant field parsing for client payloads
+  lobby/
+    session.rs       the champ select session model
+    aliases.rs       the hidden names, given out the way the client does
+    identity.rs      matching names to slots: exact steps, then a guess
+    stats.rs         rank, match history and mastery, with a cache
+    flags.rs         red flags and the team summary
+    view.rs          the lobby view sent to the frontend
+    mod.rs           ties it together for each session update
   features/
-    teammates.rs     resolve teammates (session, or riot chat when hidden)
     auto_accept.rs   accept ready checks
+    dodge.rs         the two-click dodge and the last-second dodge
 ```
 
-the frontend is react, typescript, vite, tailwind, and shadcn/ui, styled as a dark hextech panel. it subscribes to backend events and renders the teammate cards and the auto-accept toggle. champion icons come from riot's data dragon cdn.
+the frontend is react, typescript, vite and tailwind with radix primitives, in its own dark graphite design. it subscribes to backend events and renders the screens: waiting for league, idle (auto-accept and the last lobby), champ select, settings and a first-run welcome. champion icons come from riot's data dragon cdn. `npm run dev` without the tauri shell serves the ui with sample data (for example `http://localhost:1420/?screen=lobby&lobby=ranked`) so it can be reviewed without league running.
 
 ## scope
 
-dodging is manual (a button you press), never automatic. deliberately out of scope: enemy team identities (riot does not expose them), draft or matchup analytics, win probability, any automation of in-game actions, and platforms other than macos and windows.
+dodging always starts with you: the button, or the last-second dodge you arm for one lobby. expose never dodges because of a flag. deliberately out of scope: enemy team identities (riot does not expose them), draft or matchup analytics, win probability, any automation of in-game actions, and platforms other than macos and windows.
+
+## screenshots
+
+coming with the first public post.
 
 ## disclaimer
 
