@@ -93,10 +93,17 @@ export function statusFor(screen: PreviewScreen): ConnectionStatus {
 // ranked: names matched through the scramble key, one teammate's stats still
 // loading. guess: the key could not be recovered, so four best guesses.
 // resolving: the first moments of a ranked lobby, names known but not yet tied
-// to slots. normal: a draft game where nothing is hidden.
-export type LobbyVariant = "ranked" | "guess" | "resolving" | "normal";
+// to slots. hidden: a ranked lobby without the riot client, so no names at all.
+// normal: a draft game where nothing is hidden.
+export type LobbyVariant = "ranked" | "guess" | "resolving" | "hidden" | "normal";
 
-export const LOBBY_VARIANTS: readonly LobbyVariant[] = ["ranked", "guess", "resolving", "normal"];
+export const LOBBY_VARIANTS: readonly LobbyVariant[] = [
+  "ranked",
+  "guess",
+  "resolving",
+  "hidden",
+  "normal",
+];
 
 export interface LobbyOptions {
   provider?: ScoutProvider;
@@ -381,6 +388,7 @@ const DEFAULT_PENDING: Record<LobbyVariant, readonly string[]> = {
   ranked: [TEAM[4]?.key ?? ""],
   guess: [],
   resolving: [],
+  hidden: [],
   normal: [],
 };
 
@@ -388,6 +396,7 @@ const TIMERS: Record<LobbyVariant, { phase: string; timeLeftMs: number }> = {
   ranked: { phase: "BAN_PICK", timeLeftMs: 27_000 },
   guess: { phase: "BAN_PICK", timeLeftMs: 21_000 },
   resolving: { phase: "PLANNING", timeLeftMs: 24_000 },
+  hidden: { phase: "BAN_PICK", timeLeftMs: 25_000 },
   normal: { phase: "FINALIZATION", timeLeftMs: 9_000 },
 };
 
@@ -412,7 +421,7 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
   const anonymous = variant !== "normal";
 
   const players = TEAM.map((player): PlayerView => {
-    const resolved = player.isSelf || variant !== "resolving";
+    const resolved = player.isSelf || (variant !== "resolving" && variant !== "hidden");
     const kind = matchKind(player, variant);
     const loading = resolved && pending.includes(player.key);
     const stats = resolved && !loading ? statsFor(player, now) : null;

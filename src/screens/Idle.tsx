@@ -1,10 +1,11 @@
 import { Users, Zap } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Toggle } from "@/components/ui/toggle";
 import type { LastLobby } from "@/hooks/useLobby";
+import { useMinuteClock } from "@/hooks/useMinuteClock";
 import { capitalize, queueName, timeAgo } from "@/lib/format";
 import type { Summary } from "@/types";
 
@@ -105,14 +106,4 @@ function SummaryChip({ summary }: { summary: Summary }) {
       {capitalize(summary.label)}
     </Chip>
   );
-}
-
-// the current time, refreshed every half minute: enough for "12m ago" labels.
-function useMinuteClock(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const ticker = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(ticker);
-  }, []);
-  return now;
 }

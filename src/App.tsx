@@ -1,18 +1,18 @@
-import { Users } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Header } from "@/components/shell/Header";
 import { Notices } from "@/components/shell/Notices";
-import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NoticeProvider } from "@/hooks/notices";
 import { useAutoAccept } from "@/hooks/useAutoAccept";
+import { useChampions } from "@/hooks/useChampions";
 import { useLastLobby, useLobby } from "@/hooks/useLobby";
 import { useSettings } from "@/hooks/useSettings";
 import { useStatus } from "@/hooks/useStatus";
 import { useUpdate } from "@/hooks/useUpdate";
 import { previewScreen } from "@/lib/bridge";
 import { Idle } from "@/screens/Idle";
+import { Lobby } from "@/screens/Lobby";
 import { Settings } from "@/screens/Settings";
 import { Waiting } from "@/screens/Waiting";
 import { Welcome } from "@/screens/Welcome";
@@ -34,9 +34,12 @@ function Shell() {
   const status = useStatus();
   const lobby = useLobby();
   const lastLobby = useLastLobby(lobby);
+  // loaded up front, so the portraits are ready the moment champ select starts.
+  const champions = useChampions();
   const update = useUpdate();
   const settings = useSettings();
   const autoAccept = useAutoAccept();
+  const main = useRef<HTMLElement>(null);
   // a browser preview can open straight onto settings with ?screen=settings.
   const [settingsOpen, setSettingsOpen] = useState(() => previewScreen() === "settings");
 
@@ -68,6 +71,12 @@ function Shell() {
     settingsOpen,
   });
 
+  // each screen starts at the top: champ select closing a scrolled settings
+  // page must not open the lobby halfway down.
+  useEffect(() => {
+    main.current?.scrollTo({ top: 0 });
+  }, [screen]);
+
   let content: ReactNode = null;
   switch (screen) {
     case "loading":
@@ -86,7 +95,7 @@ function Shell() {
       );
       break;
     case "lobby":
-      content = <LobbyPlaceholder />;
+      content = <Lobby lobby={lobby} champions={champions} settings={settings.settings} />;
       break;
     case "idle":
       content = (
@@ -111,7 +120,7 @@ function Shell() {
         onToggleSettings={() => setSettingsOpen((open) => !open)}
         minimal={screen === "welcome" || screen === "loading"}
       />
-      <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <main ref={main} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div key={screen} className="flex min-h-full animate-in flex-col duration-200 fade-in-0">
           {content}
         </div>
@@ -147,13 +156,4 @@ function pickScreen({
     return "welcome";
   }
   return status === "connected" ? "idle" : "waiting";
-}
-
-// stands in for screens/Lobby.tsx until the lobby components land.
-function LobbyPlaceholder() {
-  return (
-    <EmptyState icon={Users} title="Champ select">
-      Your teammates show up here in a moment.
-    </EmptyState>
-  );
 }

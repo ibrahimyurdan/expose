@@ -3,7 +3,8 @@
 // toggles in memory, so each screen can be clicked through without league.
 // switches, all optional:
 //   ?screen=waiting|idle|lobby|settings|welcome   the screen to open (lobby)
-//   ?lobby=ranked|guess|resolving|normal|live     the lobby state (ranked); live
+//   ?lobby=ranked|guess|resolving|hidden|normal|live
+//                                                 the lobby state (ranked); live
 //                                                 plays a lobby filling in: names
 //                                                 first, then stats arriving
 //   ?update=0|failed                              up to date, or the update
