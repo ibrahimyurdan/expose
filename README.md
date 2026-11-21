@@ -68,7 +68,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
 ## release & signing
 
-tagging `v*.*.*` triggers `.github/workflows/release.yml`, which builds the macos universal `.dmg` and the windows setup `.exe` and attaches them to a draft github release. the draft stays hidden from the public until you press publish, so you can download and try the installers first. ci also builds the windows setup `.exe` on every push to main and every pull request, and keeps it as a download on the run page.
+tagging `v*.*.*` triggers `.github/workflows/release.yml`, which builds the macos universal `.dmg` and the windows setup `.exe`, attaches them to a github release, and makes it public once both are uploaded, so anyone can download them without a github account. a tag with a suffix, like `v0.2.0-beta.1`, is published as a pre-release. if either build fails, the release stays a draft hidden from the public. ci also builds the windows setup `.exe` on every push to main and every pull request, and keeps it as a download on the run page.
 
 to skip the macos "unidentified developer" warning, set these repository secrets and the workflow will sign + notarize automatically:
 
