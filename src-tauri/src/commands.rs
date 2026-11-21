@@ -4,7 +4,7 @@
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
@@ -22,6 +22,7 @@ pub const SCOUT_PROVIDER_KEY: &str = "scoutProvider";
 pub const AUTO_OPEN_KEY: &str = "autoOpen";
 pub const REVEAL_RANKED_KEY: &str = "revealRanked";
 pub const DODGE_LEAD_KEY: &str = "dodgeLeadMs";
+pub const WELCOMED_KEY: &str = "welcomed";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +32,10 @@ pub struct Settings {
     pub auto_open: bool,
     pub reveal_ranked: bool,
     pub launch_at_login: bool,
+    // how long before the lobby locks in the last-second dodge fires.
+    pub dodge_lead_ms: i64,
+    // the first-run welcome has been dismissed.
+    pub welcomed: bool,
 }
 
 #[tauri::command]
@@ -141,7 +146,40 @@ pub fn get_settings(app: AppHandle, state: State<AppState>) -> Settings {
         auto_open: state.auto_open.load(Ordering::Relaxed),
         reveal_ranked: state.reveal_ranked.load(Ordering::Relaxed),
         launch_at_login: app.autolaunch().is_enabled().unwrap_or(false),
+        dodge_lead_ms: state.dodge.lead_ms(),
+        welcomed: app
+            .store(STORE_FILE)
+            .ok()
+            .and_then(|store| store.get(WELCOMED_KEY))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false),
     }
+}
+
+// the first-run welcome is done with, for good.
+#[tauri::command]
+pub fn set_welcomed(app: AppHandle) {
+    if let Ok(store) = app.store(STORE_FILE) {
+        store.set(WELCOMED_KEY, true);
+        if let Err(error) = store.save() {
+            log::warn!("could not persist settings: {error}");
+        }
+    }
+}
+
+// opens the folder expose writes its log file to, so a problem can be
+// reported with the log attached.
+#[tauri::command]
+pub fn open_logs_folder(app: AppHandle) -> Result<(), String> {
+    let folder = app
+        .path()
+        .app_log_dir()
+        .map_err(|error| error.to_string())?;
+    // made if need be (nothing logged yet), so there is always one to open.
+    std::fs::create_dir_all(&folder).map_err(|error| error.to_string())?;
+    app.opener()
+        .open_path(folder.to_string_lossy(), None::<&str>)
+        .map_err(|error| error.to_string())
 }
 
 // toggles revealing teammate names in anonymous ranked champ select. defaults on;
@@ -193,4 +231,34 @@ pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<(), String> 
 #[tauri::command]
 pub fn open_scout(app: AppHandle) {
     lobby::open_scout(&app);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_serialize_like_the_frontend_expects() {
+        let settings = Settings {
+            auto_accept: true,
+            scout_provider: "ugg".to_string(),
+            auto_open: false,
+            reveal_ranked: true,
+            launch_at_login: false,
+            dodge_lead_ms: 2_000,
+            welcomed: true,
+        };
+        assert_eq!(
+            serde_json::to_value(&settings).unwrap(),
+            serde_json::json!({
+                "autoAccept": true,
+                "scoutProvider": "ugg",
+                "autoOpen": false,
+                "revealRanked": true,
+                "launchAtLogin": false,
+                "dodgeLeadMs": 2000,
+                "welcomed": true,
+            })
+        );
+    }
 }

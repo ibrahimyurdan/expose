@@ -8,7 +8,7 @@ use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
-use crate::show_main_window;
+use crate::{remember_window, show_main_window};
 
 // windows reports a double click as two clicks plus a double click event, which
 // would open the window and hide it again straight away. a click that comes
@@ -94,6 +94,7 @@ fn toggle_window(app: &AppHandle) {
         let visible = window.is_visible().unwrap_or(false);
         let minimized = window.is_minimized().unwrap_or(false);
         if visible && !minimized {
+            remember_window(app);
             let _ = window.hide();
         } else {
             show_main_window(app);

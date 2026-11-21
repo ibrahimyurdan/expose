@@ -18,6 +18,7 @@ use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, Manager, WindowEvent};
 use tauri_plugin_store::StoreExt;
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use commands::{
     AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, DODGE_LEAD_KEY, REVEAL_RANKED_KEY, SCOUT_PROVIDER_KEY,
@@ -29,6 +30,10 @@ use state::AppState;
 // quietly in the tray while a normal launch opens the window.
 const AUTOSTART_FLAG: &str = "--autostart";
 
+// the window comes back at the size and position it was left at. whether it
+// shows stays with expose: it starts hidden and appears when expose decides.
+const WINDOW_STATE: StateFlags = StateFlags::SIZE.union(StateFlags::POSITION);
+
 fn main() {
     let app = tauri::Builder::default()
         // single instance must be registered first: a second launch is
@@ -38,6 +43,11 @@ fn main() {
         }))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(WINDOW_STATE)
+                .build(),
+        )
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
@@ -60,6 +70,8 @@ fn main() {
             commands::get_lobby,
             commands::set_last_second_dodge,
             commands::set_dodge_lead,
+            commands::set_welcomed,
+            commands::open_logs_folder,
         ])
         .on_window_event(|window, event| {
             // closing the window keeps expose running and just hides it; it is
@@ -67,6 +79,7 @@ fn main() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
+                    remember_window(window.app_handle());
                     let _ = window.hide();
                 }
             }
@@ -197,6 +210,15 @@ fn start_logging(app: &AppHandle) {
 
 fn show_main_window(app: &AppHandle) {
     reveal_main_window(app, true);
+}
+
+// writes the window's size and position to disk now. the plugin also does on
+// exit, but a hidden expose may never exit cleanly (a windows shutdown ends
+// it), so every hide by the user saves it as well.
+fn remember_window(app: &AppHandle) {
+    if let Err(error) = app.save_window_state(WINDOW_STATE) {
+        log::warn!("could not save the window size and position: {error}");
+    }
 }
 
 // shows the panel, bringing it back if it was minimized. focus is optional so

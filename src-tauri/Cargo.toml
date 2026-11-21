@@ -1,6 +1,6 @@
 [package]
 name = "expose"
-version = "0.1.0"
+version = "0.2.0"
 description = "League of Legends lobby companion that surfaces champ-select teammates, auto-accepts queue pops, and dodges in one click"
 authors = ["moge"]
 edition = "2021"
@@ -31,6 +31,7 @@ tauri-plugin-log = "2.9.2"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-single-instance = "2.4.2"
 tauri-plugin-store = "2.4.3"
+tauri-plugin-window-state = "2"
 thiserror = "2.0.18"
 tokio = { version = "1.47", features = ["full"] }
 tokio-rustls = "0.26.4"
