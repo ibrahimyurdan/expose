@@ -6,6 +6,7 @@ mod ddragon;
 mod error;
 mod features;
 mod lcu;
+mod lobby;
 mod models;
 mod scout;
 mod state;
