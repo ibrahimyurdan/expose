@@ -7,3 +7,4 @@
 pub mod aliases;
 pub mod identity;
 pub mod session;
+pub mod stats;

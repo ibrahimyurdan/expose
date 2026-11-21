@@ -11,6 +11,7 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::de::DeserializeOwned;
 
 use crate::error::{Error, Result};
+use crate::lobby::stats::{ChampionMastery, MatchHistoryList, RankedStats};
 use crate::models::{ChatParticipant, ChatParticipants, RegionLocale, Summoner};
 
 #[derive(Clone)]
@@ -62,6 +63,30 @@ impl LcuClient {
     pub async fn summoner_by_puuid(&self, puuid: &str) -> Result<Summoner> {
         self.get_json(&format!("/lol-summoner/v2/summoners/puuid/{puuid}"))
             .await
+    }
+
+    // a player's ranked standing in every queue.
+    pub async fn ranked_stats(&self, puuid: &str) -> Result<RankedStats> {
+        self.get_json(&format!("/lol-ranked/v1/ranked-stats/{puuid}"))
+            .await
+    }
+
+    // a player's newest games, at most count of them. both ends of the index
+    // range are included.
+    pub async fn match_history(&self, puuid: &str, count: usize) -> Result<MatchHistoryList> {
+        let end = count.max(1) - 1;
+        self.get_json(&format!(
+            "/lol-match-history/v1/products/lol/{puuid}/matches?begIndex=0&endIndex={end}"
+        ))
+        .await
+    }
+
+    // a player's mastery on every champion they have played.
+    pub async fn champion_mastery(&self, puuid: &str) -> Result<Vec<ChampionMastery>> {
+        self.get_json(&format!(
+            "/lol-champion-mastery/v1/{puuid}/champion-mastery"
+        ))
+        .await
     }
 
     // the client's region, used to build region-correct op.gg links.

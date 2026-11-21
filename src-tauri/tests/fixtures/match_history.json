@@ -1,0 +1,517 @@
+{
+  "accountId": 2468013579,
+  "games": {
+    "gameBeginDate": "",
+    "gameCount": 8,
+    "gameEndDate": "",
+    "gameIndexBegin": 0,
+    "gameIndexEnd": 7,
+    "games": [
+      {
+        "gameCreation": 1795170000000,
+        "gameCreationDate": "2026-11-20T10:20:00.000Z",
+        "gameDuration": 1834,
+        "gameId": 5123400008,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 64,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 11,
+            "spell2Id": 4,
+            "stats": {
+              "assists": 6,
+              "champLevel": 15,
+              "deaths": 7,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 10234,
+              "kills": 4,
+              "neutralMinionsKilled": 160,
+              "totalMinionsKilled": 30,
+              "win": false
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "JUNGLE", "participantId": 1, "role": "NONE" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 420,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795166000000,
+        "gameCreationDate": "2026-11-20T09:13:20.000Z",
+        "gameDuration": 240,
+        "gameId": 5123400007,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 64,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 11,
+            "spell2Id": 4,
+            "stats": {
+              "assists": 0,
+              "champLevel": 3,
+              "deaths": 1,
+              "gameEndedInEarlySurrender": true,
+              "goldEarned": 980,
+              "kills": 0,
+              "neutralMinionsKilled": 12,
+              "totalMinionsKilled": 2,
+              "win": false
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "JUNGLE", "participantId": 1, "role": "NONE" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 420,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795162000000,
+        "gameCreationDate": "2026-11-20T08:06:40.000Z",
+        "gameDuration": 1100,
+        "gameId": 5123400006,
+        "gameMode": "ARAM",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 12,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 22,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 4,
+            "spell2Id": 32,
+            "stats": {
+              "assists": 20,
+              "champLevel": 18,
+              "deaths": 9,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 12011,
+              "kills": 8,
+              "neutralMinionsKilled": 0,
+              "totalMinionsKilled": 50,
+              "win": false
+            },
+            "teamId": 200,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "MIDDLE", "participantId": 1, "role": "DUO" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 450,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795158000000,
+        "gameCreationDate": "2026-11-20T07:00:00.000Z",
+        "gameDuration": 2101,
+        "gameId": 5123400005,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Other Jungler",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 29,
+              "puuid": "a8d3f0c2-5e71-4b96-8c2d-e4f1a7b09c35",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          },
+          {
+            "participantId": 2,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Other Support",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 588,
+              "puuid": "5c1e9b7d-2a48-4f03-b6e5-90d8c3a1f274",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          },
+          {
+            "participantId": 3,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 64,
+            "highestAchievedSeasonTier": "PLATINUM",
+            "participantId": 1,
+            "spell1Id": 4,
+            "spell2Id": 11,
+            "stats": {
+              "assists": 7,
+              "champLevel": 17,
+              "deaths": 1,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 15880,
+              "kills": 12,
+              "neutralMinionsKilled": 180,
+              "totalMinionsKilled": 40,
+              "win": true
+            },
+            "teamId": 200,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "JUNGLE", "participantId": 1, "role": "NONE" }
+          },
+          {
+            "championId": 25,
+            "highestAchievedSeasonTier": "SILVER",
+            "participantId": 2,
+            "spell1Id": 4,
+            "spell2Id": 3,
+            "stats": {
+              "assists": 9,
+              "champLevel": 13,
+              "deaths": 6,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 7420,
+              "kills": 1,
+              "neutralMinionsKilled": 0,
+              "totalMinionsKilled": 20,
+              "win": false
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "BOTTOM", "participantId": 2, "role": "DUO_SUPPORT" }
+          },
+          {
+            "championId": 121,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 3,
+            "spell1Id": 11,
+            "spell2Id": 4,
+            "stats": {
+              "assists": 3,
+              "champLevel": 14,
+              "deaths": 8,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 9105,
+              "kills": 2,
+              "neutralMinionsKilled": 150,
+              "totalMinionsKilled": 35,
+              "win": false
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "JUNGLE", "participantId": 3, "role": "NONE" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 420,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795150000000,
+        "gameCreationDate": "2026-11-20T04:46:40.000Z",
+        "gameDuration": 1650,
+        "gameId": 5123400004,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 412,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 4,
+            "spell2Id": 14,
+            "stats": {
+              "assists": 17,
+              "champLevel": 13,
+              "deaths": 3,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 7790,
+              "kills": 1,
+              "neutralMinionsKilled": 0,
+              "totalMinionsKilled": 25,
+              "win": true
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "BOTTOM", "participantId": 1, "role": "DUO" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 400,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795140000000,
+        "gameCreationDate": "2026-11-20T02:00:00.000Z",
+        "gameDuration": 1920,
+        "gameId": 5123400003,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 222,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 7,
+            "spell2Id": 4,
+            "stats": {
+              "assists": 8,
+              "champLevel": 16,
+              "deaths": 4,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 14420,
+              "kills": 9,
+              "neutralMinionsKilled": 12,
+              "totalMinionsKilled": 210,
+              "win": true
+            },
+            "teamId": 200,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "BOTTOM", "participantId": 1, "role": "DUO_CARRY" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 420,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795130000000,
+        "gameCreationDate": "2026-11-19T23:13:20.000Z",
+        "gameDuration": 1500,
+        "gameId": 5123400002,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 103,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 4,
+            "spell2Id": 14,
+            "stats": {
+              "assists": 5,
+              "champLevel": 15,
+              "deaths": 5,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 10566,
+              "kills": 5,
+              "neutralMinionsKilled": 4,
+              "totalMinionsKilled": 180,
+              "win": false
+            },
+            "teamId": 100,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "MIDDLE", "participantId": 1, "role": "SOLO" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 420,
+        "seasonId": 0,
+        "teams": []
+      },
+      {
+        "gameCreation": 1795120000000,
+        "gameCreationDate": "2026-11-19T20:26:40.000Z",
+        "gameDuration": 1700,
+        "gameId": 5123400001,
+        "gameMode": "CLASSIC",
+        "gameType": "MATCHED_GAME",
+        "gameVersion": "16.23.712.4211",
+        "mapId": 11,
+        "participantIdentities": [
+          {
+            "participantId": 1,
+            "player": {
+              "accountId": 0,
+              "currentAccountId": 0,
+              "currentPlatformId": "NA1",
+              "gameName": "Sample Teammate",
+              "matchHistoryUri": "",
+              "platformId": "NA1",
+              "profileIcon": 6,
+              "puuid": "3f6c2a9e-8b14-4d7e-9a35-c1e0f7b24d68",
+              "summonerId": 0,
+              "summonerName": "",
+              "tagLine": "NA1"
+            }
+          }
+        ],
+        "participants": [
+          {
+            "championId": 64,
+            "highestAchievedSeasonTier": "GOLD",
+            "participantId": 1,
+            "spell1Id": 11,
+            "spell2Id": 4,
+            "stats": {
+              "assists": 9,
+              "champLevel": 15,
+              "deaths": 3,
+              "gameEndedInEarlySurrender": false,
+              "goldEarned": 11307,
+              "kills": 6,
+              "neutralMinionsKilled": 140,
+              "totalMinionsKilled": 28,
+              "win": true
+            },
+            "teamId": 200,
+            "timeline": { "creepsPerMinDeltas": {}, "lane": "NONE", "participantId": 1, "role": "NONE" }
+          }
+        ],
+        "platformId": "NA1",
+        "queueId": 490,
+        "seasonId": 0,
+        "teams": []
+      }
+    ]
+  },
+  "platformId": "NA1"
+}
