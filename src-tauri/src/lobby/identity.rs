@@ -1,4 +1,4 @@
-// exact identity matching: which real account sits in each slot of your team.
+// identity matching: which real account sits in each slot of your team.
 //
 // in anonymous ranked champ select the league client hides every teammate
 // outside your party behind an obfuscated puuid, while the riot client's chat
@@ -6,14 +6,24 @@
 // order, each touching only players still unresolved: you, anyone the session
 // names, the lobby's scramble key, then elimination. all four are exact, and a
 // hidden player is only ever matched to a name the riot client already lists,
-// so expose never reveals someone the riot client does not. whoever is left
-// can only be guessed, and a guess is always marked as one.
+// so expose never reveals someone the riot client does not. guess is the fifth
+// step, for whoever is left: it places the remaining names where their recent
+// games fit best, and every match it makes is marked as a guess.
 
 use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
 use super::session::{is_blank, Session, SessionPlayer};
+use super::stats::{PlayerStats, Position};
+
+// a guess places at most one team's worth of players, which keeps the search
+// over every pairing small (5! = 120 at most).
+const MAX_GUESSED: usize = 5;
+// how far the best pairing has to lead the next best one for a guess to count
+// as high or medium confidence.
+const HIGH_LEAD: f64 = 0.5;
+const MEDIUM_LEAD: f64 = 0.2;
 
 // a real account in the champ select chat, as the riot client lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -243,9 +253,171 @@ fn from_candidate(candidate: &Candidate, kind: MatchKind) -> Identity {
     }
 }
 
+// what champ select shows about a slot nobody could be matched to exactly.
+#[derive(Debug, Clone)]
+pub struct SlotHint {
+    // the player key (see SessionPlayer::key).
+    pub key: String,
+    pub position: Option<Position>,
+    pub is_autofilled: bool,
+    pub spells: (i64, i64),
+    // 0 while the slot has neither picked nor declared a champion.
+    pub champion_id: i64,
+}
+
+// the best guess at who sits in each slot, keyed by player key. candidates are
+// the chat names no exact step used, each with their stats. every pairing of
+// slots and names is tried, as many pairs as the shorter side allows, and the
+// one that fits best overall wins. its lead over the next best pairing says
+// how sure the guess is; with nothing to compare against, the guess is low.
+pub fn guess(
+    slots: &[SlotHint],
+    candidates: &[(Candidate, PlayerStats)],
+) -> HashMap<String, Identity> {
+    let mut seen = HashSet::new();
+    let candidates: Vec<&(Candidate, PlayerStats)> = candidates
+        .iter()
+        .filter(|(candidate, _)| {
+            !is_blank(&candidate.puuid) && seen.insert(candidate.puuid.to_ascii_lowercase())
+        })
+        .collect();
+    // more names than a team holds means the chat was not this lobby's alone.
+    if slots.len() > MAX_GUESSED || candidates.len() > MAX_GUESSED {
+        return HashMap::new();
+    }
+
+    let fits: Vec<Vec<f64>> = slots
+        .iter()
+        .map(|slot| {
+            candidates
+                .iter()
+                .map(|(_, stats)| fit(slot, stats))
+                .collect()
+        })
+        .collect();
+    let mut ranked: Vec<(f64, Vec<(usize, usize)>)> = pairings(slots.len(), candidates.len())
+        .into_iter()
+        .map(|pairs| {
+            let total = pairs.iter().map(|&(slot, player)| fits[slot][player]).sum();
+            (total, pairs)
+        })
+        .collect();
+    // best first. the sort is stable, so of two equal totals the pairing
+    // tried first wins.
+    ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let Some((best, pairs)) = ranked.first() else {
+        return HashMap::new();
+    };
+    let runner_up = ranked.get(1).map_or(*best, |(total, _)| *total);
+    let confidence = lead_confidence(best - runner_up);
+
+    pairs
+        .iter()
+        .map(|&(slot, player)| {
+            let (candidate, _) = candidates[player];
+            let identity = Identity {
+                confidence,
+                ..from_candidate(candidate, MatchKind::Guess)
+            };
+            (slots[slot].key.clone(), identity)
+        })
+        .collect()
+}
+
+// how well a player's recent games fit a slot: the share of their games in
+// the slot's role (a quarter as much when the slot is autofilled, since the
+// player is likely off their usual role), half the share with the slot's exact
+// summoner spells, and their experience on the slot's champion. anything the
+// player has no data for adds nothing.
+fn fit(slot: &SlotHint, stats: &PlayerStats) -> f64 {
+    let history = stats.history.as_ref();
+    let role = match (slot.position, history) {
+        (Some(position), Some(history)) => history.role_share(position),
+        _ => 0.0,
+    };
+    let role_weight = if slot.is_autofilled { 0.25 } else { 1.0 };
+    let spells = history.map_or(0.0, |history| history.spell_share(slot.spells));
+    role_weight * role + 0.5 * spells + champion_fit(slot.champion_id, stats)
+}
+
+// games on the champion count for most of it, up to five games; mastery for
+// the rest, in full from 10,000 points and by half below that.
+fn champion_fit(champion_id: i64, stats: &PlayerStats) -> f64 {
+    if champion_id == 0 {
+        return 0.0;
+    }
+    let games = stats
+        .history
+        .as_ref()
+        .map_or(0, |history| history.games_on(champion_id));
+    let points = stats
+        .mastery
+        .as_ref()
+        .and_then(|mastery| mastery.get(&champion_id))
+        .copied()
+        .unwrap_or(0);
+    let mastery = if points >= 10_000 {
+        1.0
+    } else if points > 0 {
+        0.5
+    } else {
+        0.0
+    };
+    0.7 * (games as f64 / 5.0).min(1.0) + 0.3 * mastery
+}
+
+// every way to pair slots with players one to one, as many pairs as the
+// smaller side allows, each pairing as (slot, player) index pairs.
+fn pairings(slots: usize, players: usize) -> Vec<Vec<(usize, usize)>> {
+    let (rows, columns) = (slots.min(players), slots.max(players));
+    // every ordered choice of `rows` distinct columns.
+    let mut choices: Vec<Vec<usize>> = vec![Vec::new()];
+    for _ in 0..rows {
+        let mut longer = Vec::new();
+        for chosen in &choices {
+            for column in (0..columns).filter(|column| !chosen.contains(column)) {
+                let mut next = chosen.clone();
+                next.push(column);
+                longer.push(next);
+            }
+        }
+        choices = longer;
+    }
+    choices
+        .into_iter()
+        .map(|chosen| {
+            chosen
+                .into_iter()
+                .enumerate()
+                .map(|(row, column)| {
+                    if slots <= players {
+                        (row, column)
+                    } else {
+                        (column, row)
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn lead_confidence(lead: f64) -> Confidence {
+    // a hair of slack, so a lead of exactly 0.5 or 0.2 is not lost to the
+    // rounding of the shares it is made of.
+    const SLACK: f64 = 1e-9;
+    if lead >= HIGH_LEAD - SLACK {
+        Confidence::High
+    } else if lead >= MEDIUM_LEAD - SLACK {
+        Confidence::Medium
+    } else {
+        Confidence::Low
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lobby::stats::{GameSummary, PlayerHistory};
 
     // random-looking stand-ins: the lobby's scramble key, a second key for the
     // ambiguity test, you, a duo partner, four hidden teammates' real puuids,
@@ -580,5 +752,263 @@ mod tests {
             serde_json::to_value(levels).unwrap(),
             serde_json::json!(["high", "medium", "low"])
         );
+    }
+
+    // a slot that has picked no champion yet, with flash and teleport.
+    fn slot(key: &str, position: Position) -> SlotHint {
+        SlotHint {
+            key: key.to_string(),
+            position: Some(position),
+            is_autofilled: false,
+            spells: (4, 12),
+            champion_id: 0,
+        }
+    }
+
+    // recent games, so many in each role, on champion 1 with flash and ignite.
+    fn played(roles: &[(Position, usize)]) -> PlayerStats {
+        let games = roles
+            .iter()
+            .flat_map(|&(position, count)| {
+                let game = GameSummary {
+                    champion_id: 1,
+                    position: Some(position),
+                    spells: (4, 14),
+                    ..GameSummary::default()
+                };
+                std::iter::repeat_n(game, count)
+            })
+            .collect();
+        PlayerStats {
+            history: Some(PlayerHistory { games }),
+            ..PlayerStats::default()
+        }
+    }
+
+    fn on_champion(mut stats: PlayerStats, champion_id: i64) -> PlayerStats {
+        for game in &mut stats.history.as_mut().expect("there are games").games {
+            game.champion_id = champion_id;
+        }
+        stats
+    }
+
+    fn with_spells(mut stats: PlayerStats, spells: (i64, i64)) -> PlayerStats {
+        for game in &mut stats.history.as_mut().expect("there are games").games {
+            game.spells = spells;
+        }
+        stats
+    }
+
+    // who was guessed into which slot, sorted by slot key.
+    fn placed(guesses: &HashMap<String, Identity>) -> Vec<(&str, &str)> {
+        let mut placed: Vec<(&str, &str)> = guesses
+            .iter()
+            .map(|(key, identity)| (key.as_str(), identity.game_name.as_str()))
+            .collect();
+        placed.sort_unstable();
+        placed
+    }
+
+    #[test]
+    fn places_a_jungle_main_in_the_jungle_slot() {
+        let slots = [slot("top", Position::Top), slot("jungle", Position::Jungle)];
+        // the jungle main is listed first, so pairing in order would be wrong.
+        let candidates = [
+            (
+                candidate(REAL[0], NAMES[0]),
+                played(&[(Position::Jungle, 18), (Position::Top, 2)]),
+            ),
+            (
+                candidate(REAL[1], NAMES[1]),
+                played(&[(Position::Top, 19), (Position::Jungle, 1)]),
+            ),
+        ];
+        let guesses = guess(&slots, &candidates);
+        assert_eq!(placed(&guesses), [("jungle", NAMES[0]), ("top", NAMES[1])]);
+        assert_eq!(
+            guesses["jungle"],
+            Identity {
+                puuid: format_uuid(REAL[0]),
+                game_name: NAMES[0].to_string(),
+                tag_line: "NA1".to_string(),
+                kind: MatchKind::Guess,
+                confidence: Confidence::High,
+            }
+        );
+        assert_eq!(guesses["top"].kind, MatchKind::Guess);
+        assert_eq!(guesses["top"].confidence, Confidence::High);
+    }
+
+    #[test]
+    fn champion_breaks_a_role_tie() {
+        // both play mid and top equally often, but only one of them has games
+        // on the champion the mid slot picked.
+        let slots = [
+            SlotHint {
+                champion_id: 103,
+                ..slot("mid", Position::Middle)
+            },
+            slot("top", Position::Top),
+        ];
+        let even = [(Position::Middle, 6), (Position::Top, 6)];
+        let candidates = [
+            (candidate(REAL[0], NAMES[0]), played(&even)),
+            (
+                candidate(REAL[1], NAMES[1]),
+                on_champion(played(&even), 103),
+            ),
+        ];
+        let guesses = guess(&slots, &candidates);
+        assert_eq!(placed(&guesses), [("mid", NAMES[1]), ("top", NAMES[0])]);
+        assert_eq!(guesses["mid"].confidence, Confidence::High);
+
+        // mastery alone tips it too, by less.
+        let mut mastered = played(&even);
+        mastered.mastery = Some(HashMap::from([(103, 12_000)]));
+        let candidates = [
+            (candidate(REAL[0], NAMES[0]), played(&even)),
+            (candidate(REAL[1], NAMES[1]), mastered),
+        ];
+        let guesses = guess(&slots, &candidates);
+        assert_eq!(placed(&guesses), [("mid", NAMES[1]), ("top", NAMES[0])]);
+        assert_eq!(guesses["mid"].confidence, Confidence::Medium);
+    }
+
+    #[test]
+    fn autofilled_slot_trusts_role_less() {
+        // a support main who runs exhaust, and a mid main who runs ignite,
+        // the spell the support slot took.
+        let support = SlotHint {
+            spells: (4, 14),
+            ..slot("support", Position::Utility)
+        };
+        let candidates = [
+            (
+                candidate(REAL[0], NAMES[0]),
+                with_spells(played(&[(Position::Utility, 10)]), (4, 3)),
+            ),
+            (
+                candidate(REAL[1], NAMES[1]),
+                played(&[(Position::Middle, 10)]),
+            ),
+        ];
+
+        // in a slot of their own choosing the role decides: 1.0 against 0.5.
+        let guesses = guess(std::slice::from_ref(&support), &candidates);
+        assert_eq!(placed(&guesses), [("support", NAMES[0])]);
+        assert_eq!(guesses["support"].confidence, Confidence::High);
+
+        // autofilled, the role counts a quarter: 0.25 against the spells' 0.5.
+        let autofilled = SlotHint {
+            is_autofilled: true,
+            ..support
+        };
+        let guesses = guess(&[autofilled], &candidates);
+        assert_eq!(placed(&guesses), [("support", NAMES[1])]);
+        assert_eq!(guesses["support"].confidence, Confidence::Medium);
+    }
+
+    #[test]
+    fn low_confidence_when_close() {
+        let slots = [slot("top", Position::Top), slot("jungle", Position::Jungle)];
+        let candidates = [
+            (
+                candidate(REAL[0], NAMES[0]),
+                played(&[(Position::Top, 10), (Position::Jungle, 10)]),
+            ),
+            (
+                candidate(REAL[1], NAMES[1]),
+                played(&[(Position::Top, 11), (Position::Jungle, 9)]),
+            ),
+        ];
+        let guesses = guess(&slots, &candidates);
+        // the slightly more top-heavy player goes top, but only just.
+        assert_eq!(placed(&guesses), [("jungle", NAMES[0]), ("top", NAMES[1])]);
+        assert!(guesses
+            .values()
+            .all(|identity| identity.kind == MatchKind::Guess
+                && identity.confidence == Confidence::Low));
+    }
+
+    #[test]
+    fn places_everyone_when_counts_differ() {
+        let slots = [slot("top", Position::Top), slot("jungle", Position::Jungle)];
+        let jungler = (
+            candidate(REAL[0], NAMES[0]),
+            played(&[(Position::Jungle, 20)]),
+        );
+        let top_laner = (candidate(REAL[1], NAMES[1]), played(&[(Position::Top, 20)]));
+        let mid_laner = (
+            candidate(REAL[2], NAMES[2]),
+            played(&[(Position::Middle, 20)]),
+        );
+
+        // more names than slots: the two that fit best are placed.
+        let guesses = guess(
+            &slots,
+            &[mid_laner.clone(), jungler.clone(), top_laner.clone()],
+        );
+        assert_eq!(placed(&guesses), [("jungle", NAMES[0]), ("top", NAMES[1])]);
+        assert!(guesses
+            .values()
+            .all(|identity| identity.confidence == Confidence::High));
+
+        // more slots than names: the one name goes where it fits best.
+        let guesses = guess(&slots, std::slice::from_ref(&jungler));
+        assert_eq!(placed(&guesses), [("jungle", NAMES[0])]);
+
+        // a player without any data still takes the slot that is left.
+        let unknown = (candidate(REAL[3], NAMES[3]), PlayerStats::default());
+        let guesses = guess(&slots, &[unknown, top_laner]);
+        assert_eq!(placed(&guesses), [("jungle", NAMES[3]), ("top", NAMES[1])]);
+    }
+
+    #[test]
+    fn guesses_only_what_it_can_compare() {
+        let slots = [slot("top", Position::Top), slot("jungle", Position::Jungle)];
+        let top_laner = (candidate(REAL[1], NAMES[1]), played(&[(Position::Top, 20)]));
+        assert!(guess(&[], std::slice::from_ref(&top_laner)).is_empty());
+        assert!(guess(&slots, &[]).is_empty());
+
+        // one slot and one name leave nothing to compare against.
+        let guesses = guess(&slots[..1], std::slice::from_ref(&top_laner));
+        assert_eq!(placed(&guesses), [("top", NAMES[1])]);
+        assert_eq!(guesses["top"].confidence, Confidence::Low);
+
+        // the same player listed twice is placed once, and a blank puuid
+        // names nobody.
+        let blank = (
+            Candidate {
+                puuid: String::new(),
+                ..candidate(REAL[2], NAMES[2])
+            },
+            played(&[(Position::Jungle, 20)]),
+        );
+        let guesses = guess(&slots, &[top_laner.clone(), top_laner.clone(), blank]);
+        assert_eq!(placed(&guesses), [("top", NAMES[1])]);
+
+        // more names than a team holds means the chat was not this lobby's.
+        let crowd: Vec<(Candidate, PlayerStats)> = (0..6u128)
+            .map(|index| {
+                (
+                    candidate(STRANGERS[0] ^ index, "Stranger"),
+                    PlayerStats::default(),
+                )
+            })
+            .collect();
+        assert!(guess(&slots, &crowd).is_empty());
+    }
+
+    #[test]
+    fn confidence_follows_the_lead() {
+        assert_eq!(lead_confidence(1.7), Confidence::High);
+        assert_eq!(lead_confidence(0.5), Confidence::High);
+        // a lead of 0.5 made of rounded shares still counts as 0.5.
+        assert_eq!(lead_confidence(0.7 - 0.2), Confidence::High);
+        assert_eq!(lead_confidence(0.49), Confidence::Medium);
+        assert_eq!(lead_confidence(0.2), Confidence::Medium);
+        assert_eq!(lead_confidence(0.3 - 0.1), Confidence::Medium);
+        assert_eq!(lead_confidence(0.19), Confidence::Low);
+        assert_eq!(lead_confidence(0.0), Confidence::Low);
     }
 }
