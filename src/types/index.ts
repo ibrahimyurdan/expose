@@ -188,25 +188,3 @@ export interface Notice {
   level: "info" | "error";
   message: string;
 }
-
-// ---- v0.1 payloads, still read by the old panel until the new screens
-// replace it ----
-
-export interface Teammate {
-  cellId: number;
-  puuid: string;
-  gameName: string;
-  tagLine: string;
-  summonerLevel: number;
-  profileIconId: number;
-  assignedPosition: string;
-  championId: number;
-  championPickIntent: number;
-  scoutUrl: string;
-  scoutLabel: string;
-}
-
-export interface ChampSelectPhase {
-  phase: string;
-  timeLeftMs: number;
-}

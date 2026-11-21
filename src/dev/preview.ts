@@ -6,7 +6,8 @@
 //   ?lobby=ranked|guess|resolving|normal|live     the lobby state (ranked); live
 //                                                 plays a lobby filling in: names
 //                                                 first, then stats arriving
-//   ?update=0                                     no update available
+//   ?update=0|failed                              up to date, or the update
+//                                                 check could not reach github
 //   ?notice=1                                     raise a sample error toast
 
 import { previewScreen, type Bridge } from "@/lib/bridge";
@@ -42,10 +43,13 @@ export function createPreviewBackend(): Bridge {
   let status: ConnectionStatus = statusFor(screen);
   let autoAccept = true;
   let settings: Settings = { ...SETTINGS, welcomed: screen !== "welcome" };
+  // like update.rs: an empty url means the check itself failed.
   const update: UpdateInfo =
     query.get("update") === "0"
-      ? { ...UPDATE, latest: UPDATE.current, available: false, url: "" }
-      : UPDATE;
+      ? { ...UPDATE, latest: UPDATE.current, available: false }
+      : query.get("update") === "failed"
+        ? { ...UPDATE, latest: UPDATE.current, available: false, url: "" }
+        : UPDATE;
 
   // the lobby is rebuilt from these whenever something it shows changes.
   let shape: { variant: LobbyVariant; pending: readonly string[] | undefined } | null =
@@ -77,10 +81,13 @@ export function createPreviewBackend(): Bridge {
     statusHandlers.forEach((handler) => handler(status));
   };
 
+  // each subscription gets its own entry, like a tauri listener id: the same
+  // handler subscribed twice (strict mode remounts) must unsubscribe once.
   const subscribe = <T>(handlers: Set<Handler<T>>, handler: Handler<T>) => {
-    handlers.add(handler);
+    const entry: Handler<T> = (payload) => handler(payload);
+    handlers.add(entry);
     return Promise.resolve(() => {
-      handlers.delete(handler);
+      handlers.delete(entry);
     });
   };
 
@@ -177,8 +184,5 @@ export function createPreviewBackend(): Bridge {
       }
       return subscribe(noticeHandlers, handler);
     },
-
-    onTeammates: () => Promise.resolve(() => {}),
-    onPhase: () => Promise.resolve(() => {}),
   };
 }

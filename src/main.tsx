@@ -3,9 +3,10 @@ import { createRoot } from "react-dom/client";
 import App from "@/App";
 import "@/index.css";
 
-// macos renders a native frosted vibrancy behind the window; opt the body into
-// translucency there so the blur shows. other platforms stay fully opaque.
-if (navigator.userAgent.includes("Macintosh")) {
+// the macos app renders a native frosted vibrancy behind the window; opt the
+// body into translucency there so the blur shows, and make room for the traffic
+// lights. windows and a plain browser preview (even on a mac) stay opaque.
+if (navigator.userAgent.includes("Macintosh") && "__TAURI_INTERNALS__" in window) {
   document.documentElement.classList.add("vibrancy");
 }
 

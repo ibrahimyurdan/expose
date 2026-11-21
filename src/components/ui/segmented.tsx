@@ -14,7 +14,10 @@ interface SegmentedProps<T extends string | number> {
   // name the group: aria-label, or aria-labelledby pointing at a visible label.
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  "aria-describedby"?: string;
   disabled?: boolean;
+  // take the full width and share it evenly between the options.
+  fill?: boolean;
   className?: string;
 }
 
@@ -26,6 +29,7 @@ function Segmented<T extends string | number>({
   options,
   onChange,
   disabled = false,
+  fill = false,
   className,
   ...labelling
 }: SegmentedProps<T>) {
@@ -64,7 +68,8 @@ function Segmented<T extends string | number>({
       role="radiogroup"
       aria-disabled={disabled || undefined}
       className={cn(
-        "inline-flex h-7 shrink-0 items-stretch gap-0.5 rounded-control border border-border bg-canvas p-0.5",
+        "h-7 shrink-0 items-stretch gap-0.5 rounded-control border border-border bg-canvas p-0.5",
+        fill ? "flex w-full" : "inline-flex",
         disabled && "opacity-40",
         className,
       )}
@@ -89,6 +94,7 @@ function Segmented<T extends string | number>({
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
               "min-w-10 rounded-sm px-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-offset-0",
+              fill && "flex-1",
               checked
                 ? "bg-surface-raised text-fg shadow-sm"
                 : "text-fg-secondary hover:text-fg",

@@ -11,13 +11,11 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
   ChampionData,
-  ChampSelectPhase,
   ConnectionStatus,
   LobbyView,
   Notice,
   ScoutProvider,
   Settings,
-  Teammate,
   UpdateInfo,
 } from "@/types";
 
@@ -25,8 +23,6 @@ const EVENT_STATUS = "expose://status";
 const EVENT_LOBBY = "expose://lobby";
 const EVENT_UPDATE = "expose://update";
 const EVENT_NOTICE = "expose://notice";
-const EVENT_TEAMMATES = "expose://teammates";
-const EVENT_PHASE = "expose://phase";
 
 export interface Bridge {
   getStatus: () => Promise<ConnectionStatus>;
@@ -55,10 +51,6 @@ export interface Bridge {
   onLobby: (handler: (lobby: LobbyView | null) => void) => Promise<UnlistenFn>;
   onUpdate: (handler: (info: UpdateInfo) => void) => Promise<UnlistenFn>;
   onNotice: (handler: (notice: Notice) => void) => Promise<UnlistenFn>;
-
-  // v0.1 events, still read by the old panel until the new screens replace it.
-  onTeammates: (handler: (teammates: Teammate[]) => void) => Promise<UnlistenFn>;
-  onPhase: (handler: (phase: ChampSelectPhase) => void) => Promise<UnlistenFn>;
 }
 
 const tauriBridge: Bridge = {
@@ -86,9 +78,6 @@ const tauriBridge: Bridge = {
   onLobby: (handler) => listen<LobbyView | null>(EVENT_LOBBY, (event) => handler(event.payload)),
   onUpdate: (handler) => listen<UpdateInfo>(EVENT_UPDATE, (event) => handler(event.payload)),
   onNotice: (handler) => listen<Notice>(EVENT_NOTICE, (event) => handler(event.payload)),
-
-  onTeammates: (handler) => listen<Teammate[]>(EVENT_TEAMMATES, (event) => handler(event.payload)),
-  onPhase: (handler) => listen<ChampSelectPhase>(EVENT_PHASE, (event) => handler(event.payload)),
 };
 
 // true when the ui runs in a plain browser instead of the app.
@@ -145,8 +134,6 @@ function previewBridge(): Bridge {
     onLobby: forward("onLobby"),
     onUpdate: forward("onUpdate"),
     onNotice: forward("onNotice"),
-    onTeammates: forward("onTeammates"),
-    onPhase: forward("onPhase"),
   };
 }
 
