@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::Semaphore;
 
-use crate::features::{self, set_status, EVENT_LOBBY};
+use crate::features::{self, dodge, set_status, EVENT_LOBBY};
 use crate::lcu::client::LcuClient;
 use crate::models::{ChatParticipant, ConnectionStatus, NoticeLevel};
 use crate::scout;
@@ -33,7 +33,7 @@ use identity::{
 };
 use session::{is_blank, Session, SessionPlayer};
 use stats::{fetch_stats, PlayerStats, Position, StatsCache};
-use view::{build_view, DodgeView, LobbyView, ScoutContext};
+use view::{build_view, LobbyView, ScoutContext};
 
 // while a hidden teammate has no exact match, the riot client's chat is read
 // again at most this often.
@@ -42,8 +42,6 @@ const CHAT_EVERY: Duration = Duration::from_secs(2);
 const CHAMP_SELECT_ROOM: &str = "champ-select";
 // what the toast says when the names in a ranked lobby cannot be read.
 const CHAT_UNAVAILABLE: &str = "Couldn't reach the Riot client, so ranked names may stay hidden.";
-// how long before the lobby locks in a last-second dodge would fire.
-const DODGE_LEAD_MS: i64 = 1_500;
 // stats requests to the league client in flight at once, across all players.
 static STATS_REQUESTS: Semaphore = Semaphore::const_new(4);
 
@@ -134,6 +132,8 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
         }
         due
     };
+    // an armed last-second dodge follows the lobby's timer.
+    dodge::on_session(app, &session);
     // slots, aliases and whatever is already known show straight away; the
     // chat can only add to them.
     update(app, client);
@@ -159,9 +159,10 @@ pub async fn handle_session(app: &AppHandle, client: &LcuClient, event_type: &st
     auto_open(app);
 }
 
-// the league client went away or champ select ended: forget the lobby and
-// tell the frontend it is gone.
+// the league client went away or champ select ended: disarm the last-second
+// dodge, forget the lobby and tell the frontend it is gone.
 pub fn reset(app: &AppHandle) {
+    dodge::disarm(app);
     let state = app.state::<AppState>();
     let mut lobby = state.lobby.lock();
     lobby.reset(0);
@@ -171,8 +172,8 @@ pub fn reset(app: &AppHandle) {
     }
 }
 
-// shows a settings change (ranked reveal, the scout site) in the current lobby
-// straight away rather than at the next session update.
+// shows a change made outside a session update (a setting, the last-second
+// dodge) in the current lobby straight away.
 pub fn refresh(app: &AppHandle) {
     let state = app.state::<AppState>();
     let reveal = state.reveal_ranked.load(Ordering::Relaxed);
@@ -258,15 +259,12 @@ fn publish(app: &AppHandle) {
             .and_then(|data| data.champions.get(&champion_id))
             .map(|entry| entry.name.clone())
     };
-    let dodge = DodgeView {
-        armed: false,
-        lead_ms: DODGE_LEAD_MS,
-    };
 
     let mut lobby = state.lobby.lock();
     let Some(session) = lobby.session.take() else {
         return;
     };
+    let dodge = state.dodge.view(session.game_id);
     let view = build_view(
         &session,
         &mut lobby,

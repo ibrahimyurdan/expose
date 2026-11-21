@@ -1,8 +1,9 @@
-// the features that act on the client by themselves (auto-accept), plus the
+// the features that act on the client (auto-accept and the dodge), plus the
 // shared status and notice helpers that the features, the lobby and the
 // supervisor use to keep the frontend in sync.
 
 pub mod auto_accept;
+pub mod dodge;
 
 use tauri::{AppHandle, Emitter, Manager};
 

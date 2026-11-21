@@ -19,7 +19,10 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager, WindowEvent};
 use tauri_plugin_store::StoreExt;
 
-use commands::{AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, REVEAL_RANKED_KEY, SCOUT_PROVIDER_KEY, STORE_FILE};
+use commands::{
+    AUTO_ACCEPT_KEY, AUTO_OPEN_KEY, DODGE_LEAD_KEY, REVEAL_RANKED_KEY, SCOUT_PROVIDER_KEY,
+    STORE_FILE,
+};
 use state::AppState;
 
 // passed by the os when it starts expose at login, so a login start can stay
@@ -55,6 +58,8 @@ fn main() {
             commands::open_scout,
             commands::get_update,
             commands::get_lobby,
+            commands::set_last_second_dodge,
+            commands::set_dodge_lead,
         ])
         .on_window_event(|window, event| {
             // closing the window keeps expose running and just hides it; it is
@@ -103,6 +108,10 @@ fn main() {
                     .and_then(|value| value.as_str().map(str::to_string))
                 {
                     *state.scout_provider.write() = provider;
+                }
+                // clamped again, in case the file was edited by hand.
+                if let Some(lead) = store.get(DODGE_LEAD_KEY).and_then(|value| value.as_i64()) {
+                    state.dodge.set_lead_ms(lead);
                 }
             }
 

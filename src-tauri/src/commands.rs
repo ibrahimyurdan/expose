@@ -9,6 +9,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
 
+use crate::features::dodge;
 use crate::lobby;
 use crate::lobby::view::LobbyView;
 use crate::models::{ChampionData, ConnectionStatus};
@@ -20,6 +21,7 @@ pub const AUTO_ACCEPT_KEY: &str = "autoAccept";
 pub const SCOUT_PROVIDER_KEY: &str = "scoutProvider";
 pub const AUTO_OPEN_KEY: &str = "autoOpen";
 pub const REVEAL_RANKED_KEY: &str = "revealRanked";
+pub const DODGE_LEAD_KEY: &str = "dodgeLeadMs";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,12 +88,42 @@ pub fn open_external(app: AppHandle, url: String) {
 // leaves the current champ select (a dodge) without closing the client. only
 // works while connected; the server-side dodge penalty still applies.
 #[tauri::command]
-pub async fn dodge(state: State<'_, AppState>) -> Result<(), String> {
-    let client = state.client.read().clone();
-    match client {
-        Some(client) => client.dodge().await.map_err(|error| error.to_string()),
-        None => Err("not connected to the league client".to_string()),
+pub async fn dodge(app: AppHandle) -> Result<(), String> {
+    dodge::dodge_now(&app).await
+}
+
+// arms or disarms the last-second dodge for the current lobby. outside champ
+// select there is nothing to arm.
+#[tauri::command]
+pub fn set_last_second_dodge(app: AppHandle, state: State<AppState>, armed: bool) {
+    let game_id = state
+        .lobby
+        .lock()
+        .session
+        .as_ref()
+        .map(|session| session.game_id);
+    match game_id {
+        Some(game_id) if armed => dodge::arm(&app, game_id),
+        _ => dodge::disarm(&app),
     }
+    lobby::refresh(&app);
+}
+
+// how long before the lobby locks in the last-second dodge fires, clamped to
+// 1 to 3 seconds.
+#[tauri::command]
+pub fn set_dodge_lead(app: AppHandle, state: State<AppState>, ms: i64) {
+    let lead = state.dodge.set_lead_ms(ms);
+    if let Ok(store) = app.store(STORE_FILE) {
+        store.set(DODGE_LEAD_KEY, lead);
+        let _ = store.save();
+    }
+    // an armed dodge already counting down moves to the new lead.
+    let session = state.lobby.lock().session.clone();
+    if let Some(session) = session {
+        dodge::on_session(&app, &session);
+    }
+    lobby::refresh(&app);
 }
 
 #[tauri::command]

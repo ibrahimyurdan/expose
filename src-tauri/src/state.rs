@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicBool;
 
 use parking_lot::{Mutex, RwLock};
 
+use crate::features::dodge::DodgeState;
 use crate::lcu::client::LcuClient;
 use crate::lobby::stats::StatsCache;
 use crate::lobby::view::LobbyView;
@@ -36,6 +37,9 @@ pub struct AppState {
     pub lobby_view: RwLock<Option<LobbyView>>,
     // player stats from recent lobbies, reused for ten minutes.
     pub stats_cache: Mutex<StatsCache>,
+    // the last-second dodge: which lobby it is armed for, its lead time and
+    // its timer.
+    pub dodge: DodgeState,
     // chosen scout site ("opgg" or "ugg"); empty or unknown is treated as opgg.
     pub scout_provider: RwLock<String>,
     // open the scout link automatically when champ select begins.
