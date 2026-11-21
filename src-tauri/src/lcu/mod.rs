@@ -9,13 +9,14 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::error::Result;
-use crate::features::{self, auto_accept, teammates};
-use crate::models::{ConnectionStatus, Teammate};
+use crate::features::{self, auto_accept};
+use crate::lobby;
+use crate::models::ConnectionStatus;
 use crate::state::AppState;
 use client::LcuClient;
 use websocket::{LcuEvent, WsStream, CHAMP_SELECT_EVENT, READY_CHECK_EVENT};
@@ -90,9 +91,7 @@ pub async fn supervise(app: AppHandle) {
         features::set_status(&app, ConnectionStatus::Waiting);
         *app.state::<AppState>().client.write() = None;
         *app.state::<AppState>().riot_client.write() = None;
-        app.state::<AppState>().summoner_cache.write().clear();
-        app.state::<AppState>().teammates.write().clear();
-        let _ = app.emit(features::EVENT_TEAMMATES, Vec::<Teammate>::new());
+        lobby::reset(&app);
 
         wait_for_next_attempt(&mut wake).await;
     }
@@ -187,7 +186,7 @@ async fn read_loop(app: &AppHandle, client: &LcuClient, mut stream: WsStream) {
 async fn dispatch(app: &AppHandle, client: &LcuClient, event: LcuEvent) {
     match event.subscription.as_str() {
         CHAMP_SELECT_EVENT => {
-            teammates::handle_session(app, client, &event.event_type, event.data).await;
+            lobby::handle_session(app, client, &event.event_type, event.data).await;
         }
         READY_CHECK_EVENT => {
             auto_accept::handle_ready_check(app, client, event.data).await;

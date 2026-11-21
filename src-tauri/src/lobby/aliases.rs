@@ -30,7 +30,7 @@ pub const ALIASES: [&str; 20] = [
 ];
 
 // the slot each player held when expose first saw them in this lobby, keyed by
-// the player's key (see SessionPlayer::key).
+// the player's key (see SessionPlayer::key). a new lobby gets a new book.
 #[derive(Debug, Default)]
 pub struct AliasBook {
     first_slots: HashMap<String, usize>,
@@ -45,11 +45,6 @@ impl AliasBook {
             .entry(key.to_string())
             .or_insert(current_slot);
         ALIASES[slot % ALIASES.len()]
-    }
-
-    // forgets every player, for a new lobby.
-    pub fn reset(&mut self) {
-        self.first_slots.clear();
     }
 }
 
@@ -78,7 +73,8 @@ mod tests {
         assert_eq!(book.alias("a", 0), "Gromp");
         // a pick-order swap moves the player to another slot; the alias stays.
         assert_eq!(book.alias("a", 4), "Gromp");
-        book.reset();
+        // the next lobby's book starts over.
+        let mut book = AliasBook::default();
         assert_eq!(book.alias("a", 4), "Scuttle Crab");
     }
 }

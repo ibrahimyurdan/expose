@@ -1,10 +1,13 @@
 // builds a multi-search url that opens every teammate at once on the chosen
-// stats site. region is the op.gg style web slug (for example "na").
+// stats site, from (name, tag) riot ids. region is the op.gg style web slug
+// (for example "na").
 
-use crate::models::Teammate;
-
-pub fn scout_url(provider: &str, teammates: &[Teammate], region: Option<&str>) -> Option<String> {
-    if teammates.is_empty() {
+pub fn scout_url(
+    provider: &str,
+    names: &[(String, String)],
+    region: Option<&str>,
+) -> Option<String> {
+    if names.is_empty() {
         return None;
     }
     let region = region.filter(|slug| !slug.is_empty()).unwrap_or("na");
@@ -13,7 +16,7 @@ pub fn scout_url(provider: &str, teammates: &[Teammate], region: Option<&str>) -
         "ugg" => format!(
             "https://u.gg/lol/multisearch?region={}&summoners={}",
             ugg_region(region),
-            encode(&joined(teammates, '-'))
+            encode(&joined(names, '-'))
         ),
         // default and "opgg". only op.gg and u.gg expose a shareable
         // multi-search url; deeplol and tracker.gg do not (tracker has no lol
@@ -22,7 +25,7 @@ pub fn scout_url(provider: &str, teammates: &[Teammate], region: Option<&str>) -
         // a stale "deeplol"/"tracker" still in the store — falls back to op.gg.
         _ => format!(
             "https://www.op.gg/multisearch/{region}?summoners={}",
-            encode(&joined(teammates, '#'))
+            encode(&joined(names, '#'))
         ),
     };
     Some(url)
@@ -78,20 +81,12 @@ pub fn profile_url(
     }
 }
 
-// the display label for the chosen scout site, shown on the row button.
-pub fn provider_label(provider: &str) -> &'static str {
-    match provider {
-        "ugg" => "U.GG",
-        _ => "OP.GG",
-    }
-}
-
-// joins teammates as "name<sep>tag,name<sep>tag,...". the separator between
+// joins riot ids as "name<sep>tag,name<sep>tag,...". the separator between
 // name and tag differs by site (op.gg uses '#', u.gg uses '-').
-fn joined(teammates: &[Teammate], sep: char) -> String {
-    teammates
+fn joined(names: &[(String, String)], sep: char) -> String {
+    names
         .iter()
-        .map(|teammate| format!("{}{sep}{}", teammate.game_name, teammate.tag_line))
+        .map(|(name, tag)| format!("{name}{sep}{tag}"))
         .collect::<Vec<_>>()
         .join(",")
 }
@@ -113,26 +108,13 @@ fn encode(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Teammate;
 
-    fn team() -> Vec<Teammate> {
+    fn team() -> Vec<(String, String)> {
         ["Faker#KR1", "Hide on bush#NA1"]
             .iter()
             .map(|id| {
                 let (name, tag) = id.split_once('#').unwrap();
-                Teammate {
-                    cell_id: 0,
-                    puuid: String::new(),
-                    game_name: name.to_string(),
-                    tag_line: tag.to_string(),
-                    summoner_level: 0,
-                    profile_icon_id: 0,
-                    assigned_position: String::new(),
-                    champion_id: 0,
-                    champion_pick_intent: 0,
-                    scout_url: String::new(),
-                    scout_label: String::new(),
-                }
+                (name.to_string(), tag.to_string())
             })
             .collect()
     }
@@ -209,12 +191,5 @@ mod tests {
             profile_url("ugg", Some("kr"), "Hide on bush", "KR1"),
             "https://u.gg/lol/profile/kr/Hide%20on%20bush-KR1/overview"
         );
-    }
-
-    #[test]
-    fn provider_label_maps_known_and_unknown() {
-        assert_eq!(provider_label("opgg"), "OP.GG");
-        assert_eq!(provider_label("ugg"), "U.GG");
-        assert_eq!(provider_label("nonsense"), "OP.GG");
     }
 }

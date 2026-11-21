@@ -7,9 +7,11 @@
 
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::future::Future;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::Semaphore;
 
 use super::identity::parse_uuid;
 use super::session::is_blank;
@@ -85,7 +87,6 @@ pub struct GameSummary {
     pub kills: i64,
     pub deaths: i64,
     pub assists: i64,
-    pub queue_id: i64,
     // when the game was created, in epoch milliseconds.
     pub started_at_ms: i64,
     pub duration_s: i64,
@@ -224,7 +225,6 @@ pub struct Rank {
     pub lp: i64,
     pub wins: i64,
     pub losses: i64,
-    pub provisional: bool,
 }
 
 // everything expose shows about one player. each part is none when its
@@ -278,17 +278,18 @@ impl PlayerStats {
     }
 }
 
-// fetches one player's stats, with the four requests in flight at once.
-pub async fn fetch_stats(client: &LcuClient, puuid: &str) -> PlayerStats {
+// fetches one player's stats. the four requests go out together, each once
+// the limit, shared by every player being fetched, has room for it.
+pub async fn fetch_stats(client: &LcuClient, puuid: &str, limit: &Semaphore) -> PlayerStats {
     // nothing but a well formed puuid goes into a request path.
     if parse_uuid(puuid).is_none() {
         return PlayerStats::default();
     }
     let (summoner, ranked, history, mastery) = tokio::join!(
-        client.summoner_by_puuid(puuid),
-        client.ranked_stats(puuid),
-        client.match_history(puuid, HISTORY_GAMES),
-        client.champion_mastery(puuid),
+        limited(limit, client.summoner_by_puuid(puuid)),
+        limited(limit, client.ranked_stats(puuid)),
+        limited(limit, client.match_history(puuid, HISTORY_GAMES)),
+        limited(limit, client.champion_mastery(puuid)),
     );
     PlayerStats::from_parts(
         loaded("summoner", summoner),
@@ -297,6 +298,15 @@ pub async fn fetch_stats(client: &LcuClient, puuid: &str) -> PlayerStats {
         loaded("champion mastery", mastery),
         puuid,
     )
+}
+
+// runs a request once the limit has a permit free, holding it until the
+// request is done.
+async fn limited<T>(limit: &Semaphore, request: impl Future<Output = T>) -> T {
+    // acquire only fails on a closed semaphore, and this one is never closed;
+    // the request still goes out if it were.
+    let _permit = limit.acquire().await;
+    request.await
 }
 
 // stats fetched in earlier lobbies, keyed by puuid and reused for ten minutes.
@@ -344,7 +354,6 @@ pub struct MatchHistoryGame {
     // seconds.
     pub game_duration: i64,
     pub map_id: i64,
-    pub queue_id: i64,
     // who each participant is. a player's own history can list only them.
     pub participant_identities: Vec<ParticipantIdentity>,
     pub participants: Vec<MatchParticipant>,
@@ -413,7 +422,6 @@ pub struct RankedQueue {
     pub league_points: i64,
     pub wins: i64,
     pub losses: i64,
-    pub is_provisional: bool,
 }
 
 impl RankedStats {
@@ -433,7 +441,6 @@ impl RankedStats {
             lp: queue.league_points,
             wins: queue.wins,
             losses: queue.losses,
-            provisional: queue.is_provisional,
         })
     }
 }
@@ -459,7 +466,6 @@ fn summarize(game: &MatchHistoryGame, puuid: &str) -> Option<GameSummary> {
         kills: stats.kills,
         deaths: stats.deaths,
         assists: stats.assists,
-        queue_id: game.queue_id,
         started_at_ms: game.game_creation,
         duration_s: game.game_duration,
         position: played_position(
@@ -627,7 +633,6 @@ mod tests {
                 kills: 2,
                 deaths: 8,
                 assists: 3,
-                queue_id: 420,
                 started_at_ms: 1_795_158_000_000,
                 duration_s: 2101,
                 position: Some(Position::Jungle),
@@ -835,7 +840,6 @@ mod tests {
                 lp: 54,
                 wins: 45,
                 losses: 40,
-                provisional: false,
             })
         );
 
@@ -886,7 +890,6 @@ mod tests {
             game_name: "Sample Teammate".to_string(),
             tag_line: "NA1".to_string(),
             summoner_level: 187,
-            profile_icon_id: 6,
         };
         let mastery = vec![
             ChampionMastery {
@@ -931,7 +934,6 @@ mod tests {
             game_name: String::new(),
             tag_line: String::new(),
             summoner_level: 0,
-            profile_icon_id: 0,
         };
         let stats = PlayerStats::from_parts(
             Some(blank),

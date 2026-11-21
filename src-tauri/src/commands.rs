@@ -1,16 +1,17 @@
-// the commands the frontend can invoke. status and teammates also arrive as
-// push events; these commands cover the initial read on mount and the toggle.
+// the commands the frontend can invoke. status and the lobby also arrive as
+// push events; these commands cover the initial read on mount and the toggles.
 
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
 
+use crate::lobby;
+use crate::lobby::view::LobbyView;
 use crate::models::{ChampionData, ConnectionStatus};
-use crate::scout;
 use crate::state::AppState;
 use crate::update::UpdateInfo;
 
@@ -60,6 +61,13 @@ pub fn get_champions(state: State<AppState>) -> Option<ChampionData> {
 #[tauri::command]
 pub fn get_update(state: State<AppState>) -> Option<UpdateInfo> {
     state.update.read().clone()
+}
+
+// the latest lobby view, for a frontend that mounts mid champ select; none
+// outside champ select.
+#[tauri::command]
+pub fn get_lobby(state: State<AppState>) -> Option<LobbyView> {
+    state.lobby_view.read().clone()
 }
 
 // opens a link (the op.gg button) in the system browser. routing this through a
@@ -113,34 +121,20 @@ pub fn set_reveal_ranked(app: AppHandle, state: State<AppState>, enabled: bool) 
         store.set(REVEAL_RANKED_KEY, enabled);
         let _ = store.save();
     }
+    // turned off, hidden teammates lose their names in the open lobby at once.
+    lobby::refresh(&app);
 }
 
 #[tauri::command]
 pub fn set_scout_provider(app: AppHandle, state: State<AppState>, provider: String) {
     *state.scout_provider.write() = provider.clone();
     if let Ok(store) = app.store(STORE_FILE) {
-        store.set(SCOUT_PROVIDER_KEY, provider.clone());
+        store.set(SCOUT_PROVIDER_KEY, provider);
         let _ = store.save();
     }
-
-    // rebuild the per-row links for any already-resolved team so switching site
-    // takes effect immediately, not only on the next champ-select update.
-    let label = scout::provider_label(&provider).to_string();
-    let region = state.region.read().clone();
-    let snapshot = {
-        let mut teammates = state.teammates.write();
-        for teammate in teammates.iter_mut() {
-            teammate.scout_url = scout::profile_url(
-                &provider,
-                region.as_deref(),
-                &teammate.game_name,
-                &teammate.tag_line,
-            );
-            teammate.scout_label = label.clone();
-        }
-        teammates.clone()
-    };
-    let _ = app.emit(crate::features::EVENT_TEAMMATES, &snapshot);
+    // rebuild the lobby's profile links so switching site takes effect
+    // immediately, not only on the next champ-select update.
+    lobby::refresh(&app);
 }
 
 #[tauri::command]
@@ -163,15 +157,8 @@ pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<(), String> 
     result.map_err(|error| error.to_string())
 }
 
-// opens the chosen scout site with the whole resolved team in one tab.
+// opens the chosen scout site with everyone in the lobby in one tab.
 #[tauri::command]
-pub fn open_scout(app: AppHandle, state: State<AppState>) {
-    let teammates = state.teammates.read().clone();
-    let provider = state.scout_provider.read().clone();
-    let region = state.region.read().clone();
-    if let Some(url) = scout::scout_url(&provider, &teammates, region.as_deref()) {
-        if let Err(error) = app.opener().open_url(url, None::<&str>) {
-            log::warn!("could not open scout url: {error}");
-        }
-    }
+pub fn open_scout(app: AppHandle) {
+    lobby::open_scout(&app);
 }

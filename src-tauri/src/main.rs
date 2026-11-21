@@ -54,6 +54,7 @@ fn main() {
             commands::set_launch_at_login,
             commands::open_scout,
             commands::get_update,
+            commands::get_lobby,
         ])
         .on_window_event(|window, event| {
             // closing the window keeps expose running and just hides it; it is

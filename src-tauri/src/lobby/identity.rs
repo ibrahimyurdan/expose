@@ -68,6 +68,17 @@ pub struct Identity {
     pub confidence: Confidence,
 }
 
+// what the exact steps found.
+#[derive(Debug, Default)]
+pub struct Resolved {
+    // keyed by player key (see SessionPlayer::key).
+    pub identities: HashMap<String, Identity>,
+    // the keys of hidden players the scramble key decodes to someone the chat
+    // does not list. none of the chat names is theirs, so they are never
+    // guessed either.
+    pub absent: HashSet<String>,
+}
+
 // reads a puuid written as 8-4-4-4-12 hex digits, in any case. anything else
 // (no dashes, braces, spaces, a group of the wrong length) is not a puuid.
 pub fn parse_uuid(text: &str) -> Option<u128> {
@@ -125,11 +136,12 @@ pub fn recover_key(hidden: &[u128], real: &[u128]) -> Option<u128> {
     (best >= 2 && leaders.next().is_none()).then_some(key)
 }
 
-// the exact identities in this session, keyed by player key (see
-// SessionPlayer::key). candidates are the riot client's champ select chat
+// the exact identities in this session, and the hidden players the scramble
+// key rules out. candidates are the riot client's champ select chat
 // participants.
-pub fn resolve_exact(session: &Session, candidates: &[Candidate]) -> HashMap<String, Identity> {
+pub fn resolve_exact(session: &Session, candidates: &[Candidate]) -> Resolved {
     let mut identities = HashMap::new();
+    let mut absent = HashSet::new();
 
     // 1. you.
     if let Some(player) = session.local_player() {
@@ -198,9 +210,14 @@ pub fn resolve_exact(session: &Session, candidates: &[Candidate]) -> HashMap<Str
         let position = free
             .iter()
             .position(|candidate| parse_uuid(&candidate.puuid) == Some(decoded));
-        if let Some(index) = position {
-            let candidate = free.swap_remove(index);
-            identities.insert(player.key(), from_candidate(candidate, MatchKind::Key));
+        match position {
+            Some(index) => {
+                let candidate = free.swap_remove(index);
+                identities.insert(player.key(), from_candidate(candidate, MatchKind::Key));
+            }
+            None => {
+                absent.insert(player.key());
+            }
         }
     }
 
@@ -213,7 +230,7 @@ pub fn resolve_exact(session: &Session, candidates: &[Candidate]) -> HashMap<Str
         );
     }
 
-    identities
+    Resolved { identities, absent }
 }
 
 // an identity for a player the session names. the name comes from the session,
@@ -606,7 +623,7 @@ mod tests {
             candidate(REAL[1], NAMES[1]),
             candidate(REAL[2], NAMES[2]),
         ];
-        let identities = resolve_exact(&session, &candidates);
+        let identities = resolve_exact(&session, &candidates).identities;
         assert_eq!(
             kinds(&session, &identities),
             [
@@ -654,7 +671,7 @@ mod tests {
                 ..hidden(4, 0)
             },
         ]);
-        let identities = resolve_exact(&session, &chat());
+        let identities = resolve_exact(&session, &chat()).identities;
         assert_eq!(
             kinds(&session, &identities),
             [
@@ -682,7 +699,7 @@ mod tests {
             visible(3, REAL[3]),
             hidden(4, REAL[0] ^ KEY),
         ]);
-        let identities = resolve_exact(&session, &chat());
+        let identities = resolve_exact(&session, &chat()).identities;
         assert_eq!(
             kinds(&session, &identities),
             [
@@ -715,9 +732,9 @@ mod tests {
             candidate(STRANGERS[0], "Stranger One"),
             candidate(STRANGERS[1], "Stranger Two"),
         ];
-        let identities = resolve_exact(&session, &candidates);
+        let resolved = resolve_exact(&session, &candidates);
         assert_eq!(
-            kinds(&session, &identities),
+            kinds(&session, &resolved.identities),
             [
                 Some(MatchKind::Key),
                 Some(MatchKind::Key),
@@ -726,12 +743,19 @@ mod tests {
                 None,
             ]
         );
+        // and says so, so a guess leaves them alone too.
+        assert_eq!(resolved.absent, HashSet::from([format_uuid(REAL[3] ^ KEY)]));
 
         // with one name left over the answer is the same: the key already
         // shows that player is someone the chat does not list.
         candidates.pop();
-        let identities = resolve_exact(&session, &candidates);
-        assert_eq!(kinds(&session, &identities)[4], None);
+        let resolved = resolve_exact(&session, &candidates);
+        assert_eq!(kinds(&session, &resolved.identities)[4], None);
+        assert_eq!(resolved.absent.len(), 1);
+
+        // without a key nobody is ruled out: they may be any free name.
+        let resolved = resolve_exact(&session, &candidates[..2]);
+        assert!(resolved.absent.is_empty());
     }
 
     #[test]

@@ -15,12 +15,13 @@ const LOSS_STREAK: usize = 3;
 const NEW_TO_CHAMPION_POINTS: i64 = 10_000;
 // with no mastery to go on, recent games without the champion that make it new.
 const NEW_TO_CHAMPION_GAMES: usize = 10;
-// a win rate under 40% across at least 10 of the newest 20 games.
-const WIN_RATE_GAMES: usize = 20;
+// a win rate under 40% across at least 10 of the newest 20 games. the lobby
+// view shows the win rate and the kda over these same games.
+pub(super) const WIN_RATE_GAMES: usize = 20;
 const WIN_RATE_MIN_GAMES: usize = 10;
 const LOW_WIN_RATE: f64 = 0.40;
 // a kda under 1.5 across at least 5 of the newest 10 games.
-const KDA_GAMES: usize = 10;
+pub(super) const KDA_GAMES: usize = 10;
 const KDA_MIN_GAMES: usize = 5;
 const BAD_KDA: f64 = 1.5;
 // 5 games or more in the last 6 hours, more of them lost than won.
@@ -324,7 +325,6 @@ mod tests {
             kills: 5,
             deaths: 3,
             assists: 7,
-            queue_id: 420,
             started_at_ms: NOW - 48 * HOUR_MS,
             duration_s: 1800,
             position: Some(Position::Middle),
@@ -359,7 +359,6 @@ mod tests {
             lp: 54,
             wins: 45,
             losses: 40,
-            provisional: false,
         }
     }
 

@@ -4,51 +4,11 @@
 //
 // only the fields we actually use are modeled. every inbound field is marked
 // with serde(default) because the lcu omits or zeroes fields depending on the
-// lobby state (for example puuid is empty for hidden players).
+// lobby state (for example puuid is empty for hidden players). the champ
+// select session and the lobby view built from it live in the lobby module.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-// ---- inbound: lcu champ select ----
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChampSelectSession {
-    #[serde(default)]
-    pub my_team: Vec<ChampSelectPlayer>,
-    #[serde(default)]
-    pub timer: ChampSelectTimer,
-    // theirTeam arrives with identities scrubbed by riot, so we ignore it.
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChampSelectTimer {
-    // PLANNING, BAN_PICK, FINALIZATION, and so on.
-    #[serde(default)]
-    pub phase: String,
-    // milliseconds remaining in the current phase.
-    #[serde(default)]
-    pub adjusted_time_left_in_phase: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChampSelectPlayer {
-    #[serde(default)]
-    pub cell_id: i64,
-    #[serde(default)]
-    pub puuid: String,
-    #[serde(default)]
-    pub champion_id: i64,
-    #[serde(default)]
-    pub champion_pick_intent: i64,
-    #[serde(default)]
-    pub assigned_position: String,
-    // "HIDDEN" in anonymous ranked champ select, "UNHIDDEN" otherwise.
-    #[serde(default)]
-    pub name_visibility_type: String,
-}
 
 // ---- inbound: lcu summoner lookup ----
 
@@ -61,8 +21,6 @@ pub struct Summoner {
     pub tag_line: String,
     #[serde(default)]
     pub summoner_level: i64,
-    #[serde(default)]
-    pub profile_icon_id: i64,
 }
 
 // ---- inbound: lcu ready check ----
@@ -139,21 +97,13 @@ pub enum ConnectionStatus {
     ChampSelect,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChampSelectPhase {
-    // the raw lcu phase; the frontend maps it to a friendly label.
-    pub phase: String,
-    pub time_left_ms: i64,
-}
-
 // a transient message surfaced to the user as a toast. used so failures that
 // were previously only logged to stderr (a failed dodge, an unreachable riot
-// client) actually reach the person using the app.
+// client) actually reach the person using the app. the backend only raises
+// failures; the frontend has an info level of its own.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NoticeLevel {
-    Info,
     Error,
 }
 
@@ -162,24 +112,6 @@ pub enum NoticeLevel {
 pub struct Notice {
     pub level: NoticeLevel,
     pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Teammate {
-    pub cell_id: i64,
-    pub puuid: String,
-    pub game_name: String,
-    pub tag_line: String,
-    pub summoner_level: i64,
-    pub profile_icon_id: i64,
-    pub assigned_position: String,
-    pub champion_id: i64,
-    pub champion_pick_intent: i64,
-    // single-summoner profile link on the chosen scout site, plus the site's
-    // label for the row button. rebuilt when the scout provider changes.
-    pub scout_url: String,
-    pub scout_label: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

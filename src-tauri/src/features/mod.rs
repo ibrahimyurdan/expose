@@ -1,8 +1,8 @@
-// the two product features, plus the shared status helper they and the
+// the features that act on the client by themselves (auto-accept), plus the
+// shared status and notice helpers that the features, the lobby and the
 // supervisor use to keep the frontend in sync.
 
 pub mod auto_accept;
-pub mod teammates;
 
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -12,8 +12,8 @@ use crate::state::AppState;
 // event names emitted to the frontend. the expose:// prefix mirrors tauri's own
 // tauri:// convention and keeps our channels clearly namespaced.
 pub const EVENT_STATUS: &str = "expose://status";
-pub const EVENT_TEAMMATES: &str = "expose://teammates";
-pub const EVENT_PHASE: &str = "expose://phase";
+// the whole champ select lobby view, or null once champ select ends.
+pub const EVENT_LOBBY: &str = "expose://lobby";
 pub const EVENT_NOTICE: &str = "expose://notice";
 
 // surfaces a transient message to the user (rendered as a toast). this is the
