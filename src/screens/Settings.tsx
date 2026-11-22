@@ -1,10 +1,10 @@
-import { CircleArrowUp, FolderOpen } from "lucide-react";
 import { useId, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Segmented, type SegmentedOption } from "@/components/ui/segmented";
-import { Toggle } from "@/components/ui/toggle";
+import { RadioGroup, type RadioOption } from "@/components/ui/radio-group";
+import { Select, type SelectOption } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { usePushNotice } from "@/hooks/notices";
 import type { useSettings } from "@/hooks/useSettings";
 import { bridge } from "@/lib/bridge";
@@ -12,13 +12,13 @@ import { formatSeconds } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ScoutProvider, UpdateInfo } from "@/types";
 
-const PROVIDERS: readonly SegmentedOption<ScoutProvider>[] = [
+const PROVIDERS: readonly RadioOption<ScoutProvider>[] = [
   { value: "opgg", label: "OP.GG" },
   { value: "ugg", label: "U.GG" },
 ];
 
 // the backend accepts 1000 to 3000 ms; these are the steps worth offering.
-const LEAD_TIMES: readonly SegmentedOption<number>[] = [1000, 1500, 2000, 3000].map((ms) => ({
+const LEAD_TIMES: readonly SelectOption<number>[] = [1000, 1500, 2000, 3000].map((ms) => ({
   value: ms,
   label: formatSeconds(ms),
 }));
@@ -63,12 +63,12 @@ export function Settings({
       <Section title="General">
         <Row label="Launch at login" hint="Start Expose when you sign in to your computer.">
           {(labels) => (
-            <Toggle checked={settings.launchAtLogin} onCheckedChange={setLaunchAtLogin} {...labels} />
+            <Switch checked={settings.launchAtLogin} onCheckedChange={setLaunchAtLogin} {...labels} />
           )}
         </Row>
         <Row label="Auto-accept" hint="Accept the ready check as soon as a match is found.">
           {(labels) => (
-            <Toggle checked={autoAccept} onCheckedChange={onAutoAcceptChange} {...labels} />
+            <Switch checked={autoAccept} onCheckedChange={onAutoAcceptChange} {...labels} />
           )}
         </Row>
       </Section>
@@ -79,7 +79,7 @@ export function Settings({
           hint="Show who is behind each alias in ranked solo/duo."
         >
           {(labels) => (
-            <Toggle
+            <Switch
               checked={settings.revealRanked}
               onCheckedChange={controls.setRevealRanked}
               {...labels}
@@ -91,12 +91,12 @@ export function Settings({
           hint="Open your team on the scout site when champ select starts."
         >
           {(labels) => (
-            <Toggle checked={settings.autoOpen} onCheckedChange={controls.setAutoOpen} {...labels} />
+            <Switch checked={settings.autoOpen} onCheckedChange={controls.setAutoOpen} {...labels} />
           )}
         </Row>
         <Row label="Scout site" hint="Used for profile links and for scouting your team.">
           {(labels) => (
-            <Segmented
+            <RadioGroup
               value={settings.scoutProvider}
               options={PROVIDERS}
               onChange={controls.setScoutProvider}
@@ -113,12 +113,11 @@ export function Settings({
           stacked
         >
           {(labels) => (
-            <Segmented
+            <Select
               value={settings.dodgeLeadMs}
               options={LEAD_TIMES}
               onChange={controls.setDodgeLead}
-              fill
-              {...labels}
+              aria-labelledby={labels["aria-labelledby"]}
             />
           )}
         </Row>
@@ -129,11 +128,10 @@ export function Settings({
           {() =>
             update?.available ? (
               <Button
-                variant="primary"
-                size="sm"
+                variant="thin"
+                external
                 onClick={() => bridge.openExternal(update.url).catch(() => {})}
               >
-                <CircleArrowUp aria-hidden />
                 Get {update.latest}
               </Button>
             ) : null
@@ -141,8 +139,7 @@ export function Settings({
         </Row>
         <Row label="Logs" hint="Useful when you report a problem.">
           {() => (
-            <Button size="sm" onClick={openLogsFolder}>
-              <FolderOpen aria-hidden />
+            <Button variant="thin" onClick={openLogsFolder}>
               Open logs folder
             </Button>
           )}

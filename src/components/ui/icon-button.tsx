@@ -1,56 +1,56 @@
-import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const iconButtonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center rounded-control border transition-colors disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        ghost: "border-transparent text-fg-secondary hover:bg-surface-raised hover:text-fg",
-        secondary:
-          "border-border-strong bg-surface-raised text-fg-secondary hover:border-fg-muted hover:text-fg",
-      },
-      size: {
-        xs: "size-6 [&_svg]:size-3.5",
-        sm: "size-7 [&_svg]:size-4",
-        md: "size-8 [&_svg]:size-4",
-      },
-    },
-    defaultVariants: {
-      variant: "ghost",
-      size: "md",
-    },
-  },
-);
+type IconButtonProps = Omit<ComponentProps<"button">, "aria-label"> & {
+  // required: there is no visible text, so this is both the accessible name
+  // and the tooltip.
+  label: string;
+  // bare: a glyph alone (window controls, quiet inline icons). round: a gold
+  // ring around a dark face (the scout button).
+  variant?: "bare" | "round";
+  // sm: a 24px box with a 14px glyph, for small inline icons.
+  size?: "md" | "sm";
+  tooltip?: boolean;
+};
 
-type IconButtonProps = Omit<ComponentProps<"button">, "aria-label"> &
-  VariantProps<typeof iconButtonVariants> & {
-    // required: there is no visible text, so this is both the accessible name
-    // and the hover and focus hint.
-    label: string;
-  };
-
-// a square button that shows only an icon (pass the lucide icon as the child).
-function IconButton({ label, variant, size, className, type, ...props }: IconButtonProps) {
+// a button that shows only a glyph (pass it as the child).
+function IconButton({
+  label,
+  variant = "bare",
+  size = "md",
+  tooltip = true,
+  className,
+  type,
+  children,
+  ...props
+}: IconButtonProps) {
+  const button = (
+    <button
+      type={type ?? "button"}
+      aria-label={label}
+      // the tooltip repeats the label, so it is not announced again.
+      aria-describedby={undefined}
+      className={cn(
+        variant === "round" ? "round-btn" : "icon-btn",
+        variant === "bare" && size === "sm" && "icon-btn--sm",
+        className,
+      )}
+      {...props}
+    >
+      {variant === "round" ? <span>{children}</span> : children}
+    </button>
+  );
+  if (!tooltip) {
+    return button;
+  }
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type={type ?? "button"}
-          aria-label={label}
-          // the tooltip repeats the label, so it should not also be announced
-          // as a description.
-          aria-describedby={undefined}
-          className={cn(iconButtonVariants({ variant, size }), className)}
-          {...props}
-        />
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }
 
-export { IconButton, iconButtonVariants };
+export { IconButton };

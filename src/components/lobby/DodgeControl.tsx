@@ -2,7 +2,7 @@ import { DoorOpen } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Toggle } from "@/components/ui/toggle";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePushNotice } from "@/hooks/notices";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -76,7 +76,7 @@ function DodgeButton() {
   return (
     <>
       <Button
-        variant={stage === "idle" ? "danger" : "dangerSolid"}
+        variant="framed"
         onClick={onClick}
         onKeyDown={onKeyDown}
         disabled={stage === "leaving"}
@@ -142,13 +142,13 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <Toggle
+      <Switch
         id={`${id}-switch`}
+        danger
         checked={armed}
         onCheckedChange={onChange}
         aria-label="Dodge at the last second"
         aria-describedby={`${id}-hint`}
-        className="data-[state=checked]:bg-red"
       />
       <Tooltip>
         <TooltipTrigger asChild>

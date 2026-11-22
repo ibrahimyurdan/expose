@@ -148,7 +148,7 @@ export function LobbySummary({
         </div>
         <IconButton
           label={`Scout your team on ${scoutLabel}`}
-          variant="secondary"
+          variant="round"
           onClick={scout}
           disabled={!canScout}
         >

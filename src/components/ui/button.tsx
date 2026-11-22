@@ -1,53 +1,78 @@
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
-import type { ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type MouseEvent } from "react";
 
+import { ExternalGlyph } from "@/components/art/glyphs";
 import { cn } from "@/lib/utils";
 
-// the one text button. variants follow intent: primary for the main action on a
-// screen, secondary for everything else, ghost for quiet inline actions, and the
-// two danger variants for leaving a lobby (soft to offer it, solid to confirm).
-const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-control border font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        primary: "border-transparent bg-accent text-on-accent hover:bg-accent-hover",
-        secondary:
-          "border-border-strong bg-surface-raised text-fg hover:border-fg-muted hover:bg-border",
-        ghost: "border-transparent text-fg-secondary hover:bg-surface-raised hover:text-fg",
-        danger: "border-red/30 bg-red-bg text-red hover:border-red/60 hover:bg-red/15",
-        dangerSolid: "border-transparent bg-red text-on-accent hover:bg-red/85",
-      },
-      size: {
-        sm: "h-7 px-2 text-sm [&_svg]:size-3.5",
-        md: "h-8 px-3 text-base [&_svg]:size-4",
-        lg: "h-10 px-4 text-base [&_svg]:size-4",
-      },
-    },
-    defaultVariants: {
-      variant: "secondary",
-      size: "md",
-    },
-  },
-);
+// framed: the default button, a gold edge on a dark face. primary: the one
+// main action on a screen, on a bronze face. thin: small actions (open the
+// logs, view a profile). text: a quiet display label with no frame.
+export type ButtonVariant = "framed" | "primary" | "thin" | "text";
 
-type ButtonProps = ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    // render the styles onto the single child instead (for example a link).
-    asChild?: boolean;
+const CLASSES: Record<ButtonVariant, string> = {
+  framed: "btn",
+  primary: "btn btn--primary",
+  thin: "btn-thin",
+  text: "btn-text",
+};
+
+// after a click the button holds its pressed look and ignores input for a
+// moment, so a double click never fires twice.
+const CLICK_LOCK_MS: Record<ButtonVariant, number> = {
+  framed: 600,
+  primary: 600,
+  thin: 250,
+  text: 0,
+};
+
+type ButtonProps = ComponentProps<"button"> & {
+  variant?: ButtonVariant;
+  // the label leaves the app: an arrow follows it.
+  external?: boolean;
+};
+
+function Button({
+  variant = "framed",
+  external = false,
+  className,
+  type,
+  onClick,
+  children,
+  ...props
+}: ButtonProps) {
+  const [clicked, setClicked] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const lock = CLICK_LOCK_MS[variant];
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    // css blocks the pointer while the press shows; this blocks the keyboard.
+    if (clicked) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+    if (lock > 0) {
+      setClicked(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setClicked(false), lock);
+    }
   };
+  const framed = variant === "framed" || variant === "primary";
 
-function Button({ className, variant, size, asChild = false, type, ...props }: ButtonProps) {
-  const Comp = asChild ? Slot : "button";
   return (
-    <Comp
+    <button
       // a plain button by default, so one inside a form never submits it.
-      type={asChild ? type : (type ?? "button")}
-      className={cn(buttonVariants({ variant, size }), className)}
+      type={type ?? "button"}
+      className={cn(CLASSES[variant], clicked && "is-clicked", className)}
+      onClick={handleClick}
       {...props}
-    />
+    >
+      {framed && <span className="btn-fill" aria-hidden />}
+      {framed && <span className="btn-glow" aria-hidden />}
+      {children}
+      {external && <ExternalGlyph className="ext" />}
+    </button>
   );
 }
 
-export { Button, buttonVariants };
+export { Button };

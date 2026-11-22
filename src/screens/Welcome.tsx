@@ -57,7 +57,7 @@ export function Welcome({ onStart }: { onStart: () => void }) {
         ))}
       </ul>
 
-      <Button variant="primary" size="lg" className="w-full" onClick={onStart}>
+      <Button variant="primary" className="w-full" onClick={onStart}>
         Get started
       </Button>
     </div>

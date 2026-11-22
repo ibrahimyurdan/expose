@@ -1,42 +1,36 @@
 import { useRef, type KeyboardEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { RadioGlyph } from "@/components/art/glyphs";
 
-interface SegmentedOption<T extends string | number> {
+export interface RadioOption<T extends string | number> {
   value: T;
   label: string;
 }
 
-interface SegmentedProps<T extends string | number> {
+interface RadioGroupProps<T extends string | number> {
   value: T;
-  options: readonly SegmentedOption<T>[];
+  options: readonly RadioOption<T>[];
   onChange: (value: T) => void;
   // name the group: aria-label, or aria-labelledby pointing at a visible label.
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
   disabled?: boolean;
-  // take the full width and share it evenly between the options.
-  fill?: boolean;
-  className?: string;
 }
 
-// a small set of mutually exclusive choices shown side by side. it behaves as a
-// radio group: tab lands on the selected option, arrow keys (and home and end)
-// move the selection.
-function Segmented<T extends string | number>({
+// a row of diamond radios, for a choice between two or three values. tab
+// lands on the chosen option; arrow keys (and home and end) move the choice.
+function RadioGroup<T extends string | number>({
   value,
   options,
   onChange,
   disabled = false,
-  fill = false,
-  className,
   ...labelling
-}: SegmentedProps<T>) {
+}: RadioGroupProps<T>) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const selected = options.findIndex((option) => option.value === value);
 
-  // moves the selection and the focus together, wrapping at both ends.
+  // moves the choice and the focus together, wrapping at both ends.
   const select = (index: number) => {
     const wrapped = (index + options.length) % options.length;
     const next = options[wrapped];
@@ -64,20 +58,10 @@ function Segmented<T extends string | number>({
   };
 
   return (
-    <div
-      role="radiogroup"
-      aria-disabled={disabled || undefined}
-      className={cn(
-        "h-7 shrink-0 items-stretch gap-0.5 rounded-control border border-border bg-canvas p-0.5",
-        fill ? "flex w-full" : "inline-flex",
-        disabled && "opacity-40",
-        className,
-      )}
-      {...labelling}
-    >
+    <div role="radiogroup" aria-disabled={disabled || undefined} className="radios" {...labelling}>
       {options.map((option, index) => {
         const checked = index === selected;
-        // with nothing selected yet, the first option takes the tab stop.
+        // with nothing chosen yet, the first option takes the tab stop.
         const tabbable = checked || (selected === -1 && index === 0);
         return (
           <button
@@ -92,14 +76,9 @@ function Segmented<T extends string | number>({
             disabled={disabled}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => onKeyDown(event, index)}
-            className={cn(
-              "min-w-10 rounded-sm px-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-offset-0",
-              fill && "flex-1",
-              checked
-                ? "bg-surface-raised text-fg shadow-sm"
-                : "text-fg-secondary hover:text-fg",
-            )}
+            className="radio"
           >
+            <RadioGlyph checked={checked} />
             {option.label}
           </button>
         );
@@ -108,4 +87,4 @@ function Segmented<T extends string | number>({
   );
 }
 
-export { Segmented, type SegmentedOption };
+export { RadioGroup };

@@ -15,6 +15,7 @@
     "test:ui": "node --test \"tests/ui/*.test.ts\""
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.4.1",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",

@@ -28,7 +28,7 @@ export function Notices() {
               aria-hidden
             />
             <p className="min-w-0 flex-1 py-1 text-sm text-fg">{toast.message}</p>
-            <IconButton label="Dismiss" size="xs" onClick={() => dismiss(toast.id)}>
+            <IconButton label="Dismiss" size="sm" onClick={() => dismiss(toast.id)}>
               <X aria-hidden />
             </IconButton>
           </div>

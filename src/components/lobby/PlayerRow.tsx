@@ -351,7 +351,7 @@ function FlagLine({
       {expandable ? (
         <IconButton
           label={expanded ? `Hide details for ${title}` : `Show details for ${title}`}
-          size="xs"
+          size="sm"
           aria-expanded={expanded}
           aria-controls={expanded ? detailId : undefined}
           onClick={(event) => {

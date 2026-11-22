@@ -1,0 +1,715 @@
+/*
+  the league controls every screen shares. states come from :hover, :active,
+  :focus-visible, :disabled and aria attributes. keyboard focus shows the
+  hover look plus the ring from base.css. these live in the components layer,
+  so a tailwind utility on the same element (w-full, say) still wins.
+*/
+@layer components {
+  /* framed button, primary and default: a 2px gold gradient edge on a dark
+     face. hover swaps to the bright edge at once, fades in a warm fill and
+     pulses a glow once; pressed darkens the edge and the label. */
+  .btn {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    min-height: 32px;
+    padding: 5px 1.3em;
+    white-space: nowrap;
+    border: 0;
+    cursor: pointer;
+    font: 700 14px/18px var(--font-display);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    -webkit-font-smoothing: antialiased;
+    color: var(--gold-2);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-control);
+  }
+  .btn::before,
+  .btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border: 2px solid transparent;
+    border-image-slice: 1;
+  }
+  .btn::before {
+    border-image-source: var(--edge);
+    transition: opacity 300ms linear;
+  }
+  .btn::after {
+    border-image-source: var(--edge-hover);
+    opacity: 0;
+  }
+  .btn-fill {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: var(--fill-hover);
+    opacity: 0;
+    transition: opacity 400ms var(--ease-flat);
+  }
+  .btn-glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .btn:hover,
+  .btn:focus-visible {
+    color: var(--gold-1);
+    animation: btn-text-glow 600ms var(--ease-flat) 1;
+  }
+  .btn:hover::after,
+  .btn:focus-visible::after,
+  .btn:hover .btn-fill,
+  .btn:focus-visible .btn-fill {
+    opacity: 1;
+  }
+  .btn:hover .btn-glow {
+    animation: btn-glow 600ms var(--ease-flat) 1;
+  }
+  .btn:active {
+    color: var(--text-disabled);
+    transition: color 100ms linear;
+    animation: none;
+  }
+  .btn:active .btn-fill {
+    opacity: 0;
+  }
+  .btn:active::after {
+    opacity: 1;
+    border-image-source: var(--edge-down);
+  }
+  /* held for a moment after a click, with input blocked, so a double click
+     never fires twice. */
+  .btn.is-clicked {
+    color: var(--text-click);
+    pointer-events: none;
+    animation:
+      btn-press 130ms linear 1,
+      btn-text-glow 400ms linear 1;
+  }
+  .btn.is-clicked::after {
+    opacity: 1;
+    border-image-source: var(--edge-hover);
+    transition: opacity 400ms linear;
+  }
+  .btn:disabled {
+    cursor: default;
+    color: var(--text-disabled);
+    animation: none;
+  }
+  .btn:disabled::before {
+    border-image: none;
+    border-color: var(--text-disabled);
+  }
+  .btn:disabled::after,
+  .btn:disabled .btn-fill,
+  .btn:disabled .btn-glow {
+    display: none;
+  }
+  .btn--primary {
+    background: var(--fill-primary);
+  }
+  .btn--primary .btn-fill {
+    background: var(--fill-primary-hover);
+  }
+  .btn--primary:active {
+    color: var(--gold-5);
+    background: var(--fill-primary-down);
+  }
+
+  /* thin button, the default for small actions: a 1px gold edge and a body
+     label. */
+  .btn-thin {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    min-width: 90px;
+    min-height: 32px;
+    padding: 1px 15px 0;
+    border: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    font: 700 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    -webkit-font-smoothing: subpixel-antialiased;
+    color: var(--gold-2);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-control);
+    transition: color 200ms linear;
+  }
+  .btn-thin::before,
+  .btn-thin::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border: 1px solid transparent;
+    border-image-slice: 1;
+    transition: opacity 200ms linear;
+  }
+  .btn-thin::before {
+    border-image-source: var(--edge);
+  }
+  .btn-thin::after {
+    border-image-source: var(--edge-hover);
+    background: var(--fill-hover);
+    opacity: 0;
+  }
+  .btn-thin:hover,
+  .btn-thin:focus-visible {
+    color: var(--gold-1);
+  }
+  .btn-thin:hover::after,
+  .btn-thin:focus-visible::after {
+    opacity: 1;
+  }
+  .btn-thin:active {
+    color: var(--gold-5);
+    transition-duration: 100ms;
+  }
+  .btn-thin:active::after {
+    opacity: 1;
+    transition-duration: 100ms;
+    border-image-source: var(--edge-down-thin);
+    background: var(--surface-raised);
+  }
+  .btn-thin.is-clicked {
+    pointer-events: none;
+  }
+  .btn-thin:disabled {
+    color: var(--text-disabled);
+    cursor: default;
+  }
+  .btn-thin:disabled::before {
+    border-image: none;
+    border-color: var(--text-disabled);
+  }
+  .btn-thin:disabled::after {
+    display: none;
+  }
+
+  /* the arrow after a label that leaves the app. */
+  .btn .ext,
+  .btn-thin .ext {
+    width: 9px;
+    height: 9px;
+    margin-left: -1px;
+    margin-top: -5px;
+    flex: none;
+  }
+
+  /* text button: a display label with no frame. */
+  .btn-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font: 700 14px/18px var(--font-display);
+    letter-spacing: 0.0325em;
+    text-transform: uppercase;
+    color: var(--gold-3);
+  }
+  .btn-text:hover,
+  .btn-text:focus-visible {
+    color: var(--gold-1);
+  }
+  .btn-text:active {
+    color: var(--gold-5);
+  }
+  .btn-text:disabled {
+    color: var(--text-disabled);
+    cursor: default;
+  }
+
+  /* bare glyph button: the window controls and quiet inline icons. no plate,
+     no red close hover. */
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+  .icon-btn:hover,
+  .icon-btn:focus-visible,
+  .icon-btn[aria-pressed="true"] {
+    color: var(--gold-1);
+  }
+  .icon-btn:active {
+    color: var(--text-muted);
+  }
+  .icon-btn:disabled {
+    color: var(--text-secondary);
+    cursor: default;
+  }
+  .icon-btn--sm {
+    width: 24px;
+    height: 24px;
+    color: var(--text-muted);
+  }
+  .icon-btn--sm svg {
+    width: 14px;
+    height: 14px;
+  }
+  .icon-btn--sm:hover,
+  .icon-btn--sm:focus-visible {
+    color: var(--gold-2);
+  }
+
+  /* round ring button: a gold ring around a dark face, for the scout button
+     and modal closes. */
+  .round-btn {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    padding: 2px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ring);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .round-btn > span {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface-well);
+    color: var(--gold-2);
+    display: grid;
+    place-items: center;
+    transition:
+      box-shadow 150ms ease-out,
+      color 150ms ease-out;
+  }
+  .round-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+  }
+  .round-btn:hover,
+  .round-btn:focus-visible {
+    background: var(--ring-hover);
+  }
+  .round-btn:hover > span,
+  .round-btn:focus-visible > span {
+    background: var(--ring-face-hover);
+    color: var(--gold-1);
+  }
+  .round-btn:active {
+    background: var(--ring-down);
+  }
+  .round-btn:active > span {
+    background: var(--surface-well);
+    color: var(--gold-5);
+    transition: none;
+  }
+  .round-btn:disabled {
+    background: var(--text-muted);
+    cursor: default;
+  }
+  .round-btn:disabled > span {
+    background: var(--surface-well);
+    color: var(--text-muted);
+  }
+
+  /* checkbox, for every on/off setting: a 12px box with a gold edge and a
+     gold check, the label beside it and an optional hint under the label. */
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .check-box {
+    position: relative;
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin: 3px 1px 1px;
+    box-sizing: border-box;
+    border: 1px solid #785a28;
+    background: radial-gradient(rgba(1, 10, 19, 0.53), rgba(1, 10, 19, 0.71));
+    box-shadow: 0 0 0 1px rgba(1, 10, 19, 0.25);
+  }
+  .check-box > svg {
+    position: absolute;
+    left: -2px;
+    top: -2px;
+    width: 14px;
+    height: 14px;
+    overflow: visible;
+    display: none;
+    color: var(--gold-4);
+  }
+  .check[aria-checked="true"] .check-box > svg {
+    display: block;
+  }
+  .check-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .check-label {
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--gold-2);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .check:hover .check-box {
+    border-image: linear-gradient(to bottom, #785a28, #a08248) 1;
+    background: linear-gradient(to bottom, rgba(1, 10, 19, 0.7), rgba(30, 37, 41, 0.55));
+  }
+  .check:hover[aria-checked="true"] .check-box > svg {
+    color: var(--gold-1);
+  }
+  .check:hover .check-label,
+  .check:focus-visible .check-label {
+    color: var(--gold-1);
+  }
+  .check[aria-disabled="true"] {
+    filter: brightness(0.5);
+    cursor: default;
+  }
+
+  /* the lobby switch, for the two live modes (auto-accept, the last-second
+     dodge): a gold-rimmed track with a round knob that overhangs it. green
+     when on; red for the dodge. */
+  .switch {
+    position: relative;
+    flex: none;
+    width: 70px;
+    height: 29px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .switch-track {
+    position: absolute;
+    inset: 2px 8px;
+    box-sizing: border-box;
+    border-radius: 13px;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(90deg, #205566 0%, #1e404d 50%, #212f36 100%) padding-box,
+      linear-gradient(to bottom, #c6a86a, #977330 50%, #6b5028) border-box;
+    box-shadow:
+      inset 0 0 0 1px #1e2328,
+      0 0 0 1px rgba(1, 10, 19, 0.4),
+      0 1px 0 rgba(1, 10, 19, 0.84);
+  }
+  .switch-track::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.5s;
+    background: linear-gradient(90deg, #294936 0%, #2b5238 25%, #33a044 70%, #339e42 100%);
+  }
+  .switch[aria-checked="true"] .switch-track::after {
+    opacity: 1;
+  }
+  .switch--danger .switch-track::after {
+    background: linear-gradient(90deg, #690014 0%, #be1e37 50%, #be1e37 100%);
+  }
+  /* the check the on track shows beside the knob. */
+  .switch-check {
+    position: absolute;
+    z-index: 1;
+    left: 8px;
+    top: 50%;
+    width: 12px;
+    height: 9px;
+    transform: translateY(-50%);
+    color: rgba(1, 10, 19, 0.45);
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .switch[aria-checked="true"] .switch-check {
+    opacity: 1;
+  }
+  .switch-knob {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    display: grid;
+    place-items: center;
+    color: var(--gold-2);
+    transition: left 0.2s ease-in-out;
+    background:
+      linear-gradient(#1e2328, #1e2328) padding-box,
+      linear-gradient(to bottom, #c2a261, #977330 50%, #6b5028) border-box;
+    box-shadow: 0 0 0 1px rgba(1, 10, 19, 0.63);
+  }
+  .switch-knob svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+  }
+  .switch[aria-checked="true"] .switch-knob {
+    left: 34px;
+  }
+  .switch:hover .switch-knob,
+  .switch:focus-visible .switch-knob {
+    color: var(--gold-1);
+    background:
+      linear-gradient(to bottom, #1f2428, #393a34) padding-box,
+      linear-gradient(to bottom, #efe5d0, #c99d3f) border-box;
+  }
+  .switch:active .switch-knob {
+    color: var(--gold-5);
+    background:
+      linear-gradient(#1e2328, #1e2328) padding-box,
+      linear-gradient(to bottom, #463714, #6b5024) border-box;
+  }
+  .switch:disabled {
+    cursor: default;
+  }
+  .switch:disabled .switch-track {
+    background:
+      linear-gradient(#1e2328, #1e2328) padding-box,
+      linear-gradient(#5c5b57, #5c5b57) border-box;
+  }
+  .switch:disabled .switch-track::after,
+  .switch:disabled .switch-check {
+    display: none;
+  }
+  .switch:disabled .switch-knob {
+    color: #5b5a56;
+    background:
+      linear-gradient(#1e2328, #1e2328) padding-box,
+      linear-gradient(#5c5b57, #5c5b57) border-box;
+  }
+
+  /* a row of diamond radios, for two-choice settings. the diamond's colors
+     come from --radio-band-* (see RadioGlyph). */
+  .radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 16px;
+  }
+  .radio {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    background: none;
+    white-space: nowrap;
+    cursor: pointer;
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.1em;
+    color: var(--gold-2);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .radio > svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    filter: drop-shadow(0 0 0.5px rgba(1, 10, 19, 0.25));
+  }
+  .radio:hover,
+  .radio:focus-visible,
+  .radio[aria-checked="true"] {
+    color: var(--gold-1);
+  }
+  .radio:hover,
+  .radio:focus-visible {
+    --radio-band-1: #efe5cf;
+    --radio-band-2: #e4d3a8;
+    --radio-band-3: #d9bb76;
+    --radio-band-4: #d0a652;
+    --radio-band-5: #c89b3c;
+  }
+  .radio:active {
+    --radio-band-1: #473714;
+    --radio-band-2: #4f3d17;
+    --radio-band-3: #594519;
+    --radio-band-4: #624b1f;
+    --radio-band-5: #6a5024;
+    --radio-center: #5a4320;
+  }
+  .radio:disabled {
+    color: var(--text-disabled);
+    cursor: default;
+    --radio-band-1: #3c3732;
+    --radio-band-2: #3c3732;
+    --radio-band-3: #3c3732;
+    --radio-band-4: #3c3732;
+    --radio-band-5: #3c3732;
+  }
+
+  /* framed dropdown, for choices with more than two values. */
+  .select {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 234px;
+    max-width: 100%;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 7px 25px 7px 12px;
+    cursor: pointer;
+    text-align: left;
+    background: rgba(30, 35, 40, 0.5);
+    border: 1px solid transparent;
+    border-image: linear-gradient(to top, #695625 0%, #a9852d 23%, #b88d35 93%, #c8aa6e 100%) 1;
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--text-secondary);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .select > span:first-child {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .select > svg {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    width: 13px;
+    height: 18px;
+    transform: translateY(-50%);
+    color: var(--gold-3);
+  }
+  .select:hover,
+  .select:focus-visible {
+    border-image: linear-gradient(to top, #c89b3c, #f0e6d2) 1;
+    background: linear-gradient(to top, rgba(88, 83, 66, 0.5), rgba(30, 35, 40, 0.5));
+  }
+  .select[aria-expanded="true"] {
+    border-image: none;
+    border-color: #463714;
+    color: #463714;
+  }
+  .select[aria-expanded="true"] > svg {
+    color: var(--gold-5);
+  }
+  .select:disabled {
+    cursor: default;
+    color: var(--text-disabled);
+    border-image: none;
+    border-color: var(--text-disabled);
+  }
+  .select-list {
+    z-index: 50;
+    min-width: var(--radix-select-trigger-width);
+    max-height: var(--radix-select-content-available-height);
+    background: var(--bg);
+    border: 1px solid var(--gold-6);
+    box-shadow:
+      var(--shadow-frame),
+      var(--shadow-frame-glow);
+  }
+  .select-option {
+    display: flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 2px 9px 2px 12px;
+    border-top: 1px solid #1f2123;
+    color: var(--gold-2);
+    background: var(--bg);
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    outline: none;
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .select-option:first-child {
+    border-top: 0;
+  }
+  .select-option[data-highlighted],
+  .select-option[data-state="checked"] {
+    color: var(--gold-1);
+  }
+  .select-option[data-highlighted] {
+    background: #1e2328;
+  }
+  .select-option:active {
+    color: #463714;
+  }
+}
+
+@keyframes btn-text-glow {
+  0% {
+    text-shadow: 0 0 4px rgba(240, 230, 216, 1);
+  }
+  50% {
+    text-shadow: 0 0 4px rgba(240, 230, 216, 0.5);
+  }
+  100% {
+    text-shadow: 0 0 4px rgba(240, 230, 216, 0);
+  }
+}
+
+@keyframes btn-glow {
+  0% {
+    box-shadow:
+      0 0 5px 4px rgba(240, 230, 216, 0.5),
+      inset 0 0 2px 1px rgba(240, 230, 216, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 5px 4px rgba(240, 230, 216, 0.3),
+      inset 0 0 2px 1px rgba(240, 230, 216, 0.3);
+  }
+  100% {
+    box-shadow:
+      0 0 5px 4px rgba(240, 230, 216, 0),
+      inset 0 0 2px 1px rgba(240, 230, 216, 0);
+  }
+}
+
+@keyframes btn-press {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1);
+  }
+}

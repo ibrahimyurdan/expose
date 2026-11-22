@@ -3,7 +3,7 @@ import { useId } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
-import { Toggle } from "@/components/ui/toggle";
+import { Switch } from "@/components/ui/switch";
 import type { LastLobby } from "@/hooks/useLobby";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import { capitalize, queueName, timeAgo } from "@/lib/format";
@@ -44,7 +44,7 @@ export function Idle({
                 : "Ready checks wait for you to accept them."}
             </p>
           </div>
-          <Toggle
+          <Switch
             checked={autoAccept}
             onCheckedChange={onAutoAcceptChange}
             aria-labelledby={`${id}-title`}

@@ -1,4 +1,3 @@
-import { ExternalLink } from "lucide-react";
 import { useId, type ReactNode } from "react";
 
 import { ChampionIcon, championName } from "@/components/lobby/ChampionIcon";
@@ -77,7 +76,8 @@ export function PlayerDetail({
 
       {player.scoutUrl ? (
         <Button
-          size="sm"
+          variant="thin"
+          external
           className="self-start"
           onClick={() => {
             if (player.scoutUrl) {
@@ -86,7 +86,6 @@ export function PlayerDetail({
           }}
         >
           View on {scoutLabel}
-          <ExternalLink aria-hidden />
         </Button>
       ) : null}
     </div>
