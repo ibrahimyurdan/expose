@@ -24,11 +24,11 @@ the owner wants expose to show league's real icons, the way op.gg does: the rank
 - riot's art inside expose: nothing of riot's goes into the repo or the bundle (the restyle spec's guardrail stands; riot's developer policy allows only press kit assets in products).
 - a third-party image host.
 - a broken image, an empty gap or a layout shift when league is closed or a file is missing: expose's own drawings stay as the fallback, the same size.
-- a way for the page to reach the league client beyond these images: the webview never sees the client's port or token.
+- a way for the page to reach anything beyond these images: the protocol reads only the listed files from league's archive and never talks to the client.
 
 ## approaches
 
-1. **read them from the player's own league client at runtime (picked by the owner).** the client already serves its interface images on its local port, which expose already talks to. nothing of riot's ships with expose, the art always matches the installed client, and ranks only show while league is connected anyway. costs: a small proxy in rust, and the files can't show while league is closed (the fallback covers that).
+1. **read them from the player's own league at runtime (picked by the owner).** nothing of riot's ships with expose, and the art always matches the installed client. first planned through the client's local server; a live check showed it doesn't serve these files, so rust reads them from the client's own archive on disk (see below). costs: a small archive reader in rust.
 2. bundle the emblem files in the app. works offline, but ships riot's art in a public repo and every download, which the spec ruled out and riot's developer policy does not allow.
 3. load them from communitydragon at runtime, as champion squares load from data dragon. the simplest code, but it depends on a community host serving riot's files, which the spec's guardrails excluded.
 
@@ -38,8 +38,8 @@ the owner wants expose to show league's real icons, the way op.gg does: the rank
   - small crests: `images/ranked-mini-crests/<tier>.svg`, all ten tiers plus `unranked.svg` (emerald has only the svg, so svg throughout).
   - full emblems: `images/ranked-emblem/emblem-<tier>.png`.
   - role icons: `svg/position-<top|jungle|middle|bottom|utility>.svg`, with `-light` variants.
-- the address: the client's local server at `/fe/lol-static-assets/<file>`, the pattern its own interface loads from. to be confirmed against a running client before the work is called done.
-- the path: the page asks a custom protocol registered in rust; rust checks the path against the three folders above and a strict file-name pattern (lowercase letters, digits, dashes, one dot), fetches it with the connected client's credentials over the existing tls setup, and answers with the bytes and their content type. get only. anything else, or no connected client, is a 404, and the page shows the fallback drawing.
+- the source, corrected after a live check on 2026-11-22: the client's local server does not serve its interface files (every `/fe/...` path is a 404, "invalid uri format"), so expose reads them from league's own archive on disk instead: `<league folder>/Plugins/rcp-fe-lol-static-assets/assets.wad`, the folder that holds league's lockfile. the archive is riot's wad format, version 3, with entries keyed by the xxh64 hash of the lowercased path `plugins/rcp-fe-lol-static-assets/global/default/<file>` and stored raw or zstd-compressed. all 31 files were found and unpacked on the owner's mac. it is still the player's own league that supplies the art, and it now works with league closed as long as it is installed.
+- the path: the page asks a custom protocol registered in rust; rust checks the path against the exact list of files above, reads it from the archive, and answers with the bytes and their content type. get only. anything else, no league install, or a file the archive lacks is a 404, and the page shows the fallback drawing.
 - a small in-memory cache per app run, keyed by path, so each file is fetched once.
 - the image urls are built per platform with tauri's `convertFileSrc` (macos `<scheme>://localhost/...`, windows `http://<scheme>.localhost/...`), and the content security policy's `img-src` gains both forms.
 - `RankCrest` and `PositionGlyph` stay, as the fallbacks and in the browser preview, which has no rust side.
@@ -55,4 +55,4 @@ the owner wants expose to show league's real icons, the way op.gg does: the rank
 
 - unit tests: the path check (allowed files pass; other folders, `..`, encoded characters, query strings and other methods fail) and the content type per extension.
 - the preview: with no rust side every icon falls back to the drawings, with no layout change.
-- live, with league open on the mac: the three kinds of files answer through the protocol, the row crest, the details emblem and the role icons show, and closing league falls back cleanly.
+- live, on the mac: the three kinds of files answer through the protocol, and the row crest, the details emblem and the role icons show in a champ select. with no league install (or a renamed archive), the drawings show.

@@ -4,7 +4,7 @@
 
 **Goal:** show the league client's own rank crests, rank emblems and role icons in expose, read at runtime from the player's running client, with expose's drawings as the fallback.
 
-**Architecture:** a custom protocol, `league-art`, registered in rust, answers the page's image requests for a fixed list of the client's static asset files: it fetches each from the connected client's local server with the existing credentials and keeps it in memory for the app's run. the ui builds each image url per platform and shows its own drawing until the image has loaded, or for good when it can't.
+**Architecture:** a custom protocol, `league-art`, registered in rust, answers the page's image requests for a fixed list of the client's static asset files: it reads each from league's own archive on disk (`<league folder>/Plugins/rcp-fe-lol-static-assets/assets.wad`; the client's local server turned out not to serve them) and keeps it in memory for the app's run. the ui builds each image url per platform and shows its own drawing until the image has loaded, or for good when it can't.
 
 **Tech Stack:** tauri 2.11 (`register_asynchronous_uri_scheme_protocol`), rust with reqwest (the existing `LcuClient`), react 19 and typescript, node's test runner for the pure ui helpers.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - nothing of riot's goes into the repo or the bundle: the images come only from the player's running client, through `league-art`.
-- the page never sees the client's port or token, and `league-art` answers get requests for the allowed files only; everything else is a 404 without contacting the client.
+- `league-art` answers get requests for the allowed files only, read from league's archive; everything else is a 404 without reading anything. it never talks to the client.
 - with league closed, or a file the client doesn't serve, every icon shows expose's drawing at the same size: no broken image, no gap, no layout shift.
 - the four row lines keep their heights (14, 20, 16 and 22 px).
 - code comments and docs: lowercase, plain, no emojis.
