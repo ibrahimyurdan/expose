@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Panel } from "@/components/ui/frame";
 import { RadioGroup, type RadioOption } from "@/components/ui/radio-group";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -167,7 +167,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 id={id} className="px-1 text-sm font-medium text-fg-secondary">
         {title}
       </h2>
-      <Card className="divide-y divide-border">{children}</Card>
+      <Panel className="divide-y divide-border">{children}</Panel>
     </section>
   );
 }

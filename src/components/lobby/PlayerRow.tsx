@@ -5,7 +5,7 @@ import { ChampionIcon, championName } from "@/components/lobby/ChampionIcon";
 import { FormDots } from "@/components/lobby/FormDots";
 import { PlayerDetail } from "@/components/lobby/PlayerDetail";
 import { RankBadge } from "@/components/lobby/RankBadge";
-import { Chip, type ChipTone } from "@/components/ui/chip";
+import { Chip, Tag, type ChipTone, type TagTone } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { flagText, formatKda, plural, positionLabel, riotId } from "@/lib/format";
@@ -28,9 +28,9 @@ const FLAG_TONES: Record<Severity, ChipTone> = {
 
 // a guess the backend is sure of looks settled; a shaky one asks for a second
 // look.
-const GUESS_TONES: Record<Confidence, ChipTone> = {
-  high: "accent",
-  medium: "neutral",
+const GUESS_TONES: Record<Confidence, TagTone> = {
+  high: "gold",
+  medium: "gold",
   low: "amber",
 };
 
@@ -193,9 +193,7 @@ function Identity({ player, loading }: { player: PlayerView; loading: boolean })
 
   if (player.isSelf) {
     return (
-      <Chip tone="accent" className="h-4 px-1.5">
-        You
-      </Chip>
+      <Tag tone="gold">You</Tag>
     );
   }
   if (!player.alias) {
@@ -240,10 +238,10 @@ function MatchBadge({ identity }: { identity: IdentityView }) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Chip tone={GUESS_TONES[identity.confidence]} className="h-4 px-1.5">
+          <Tag tone={GUESS_TONES[identity.confidence]}>
             Likely
             <span className="sr-only">, {hint}</span>
-          </Chip>
+          </Tag>
         </TooltipTrigger>
         <TooltipContent>{hint}</TooltipContent>
       </Tooltip>
@@ -336,7 +334,11 @@ function FlagLine({
       <ul aria-label="Flags" className="flex min-w-0 flex-wrap gap-1">
         {flags.map((flag) => (
           <li key={flag.kind} className="flex min-w-0">
-            <Chip tone={FLAG_TONES[flag.severity]} title={flagText(flag.label)}>
+            <Chip
+              tone={FLAG_TONES[flag.severity]}
+              warn={flag.severity !== "info"}
+              title={flagText(flag.label)}
+            >
               {flagText(flag.label)}
             </Chip>
           </li>

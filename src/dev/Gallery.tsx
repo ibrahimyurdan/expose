@@ -30,11 +30,16 @@ import { PositionGlyph } from "@/components/art/PositionGlyph";
 import { RankCrest } from "@/components/art/RankCrest";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Chip, Tag } from "@/components/ui/chip";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Frame, Panel, Raised } from "@/components/ui/frame";
 import { IconButton } from "@/components/ui/icon-button";
 import { RadioGroup } from "@/components/ui/radio-group";
+import { Loader } from "@/components/ui/loader";
 import { Select } from "@/components/ui/select";
+import { Status } from "@/components/ui/status";
 import { Switch } from "@/components/ui/switch";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const GLYPHS = [
   ["minimize", MinimizeGlyph],
@@ -172,11 +177,78 @@ function Controls() {
   );
 }
 
+// chips, tags, the status, frames, dividers, a tooltip, loading marks and an
+// empty state.
+function Pieces() {
+  return (
+    <>
+      <Section title="Chips and tags">
+        <Chip tone="red" warn>
+          Autofilled, mains mid
+        </Chip>
+        <Chip tone="amber" warn>
+          38% win rate, last 16
+        </Chip>
+        <Chip tone="neutral">Name One#NA1</Chip>
+        <Chip tone="info">Info</Chip>
+        <Tag tone="gold">Likely</Tag>
+        <Tag tone="amber">Likely</Tag>
+        <Tag tone="teal">Teal</Tag>
+        <span className="count">3</span>
+      </Section>
+      <Section title="Status">
+        <Status state="waiting" />
+        <Status state="connected" />
+        <Status state="champSelect" />
+      </Section>
+      <Section title="Frames">
+        <Frame lips className="w-52 p-4">
+          <p className="type-h5">Framed, with trim</p>
+          <p className="type-body">Bright at the bottom.</p>
+        </Frame>
+        <Panel className="w-44 p-3">
+          <p className="type-h6">Panel</p>
+          <p className="type-body">A quiet container.</p>
+        </Panel>
+        <Raised className="w-44 p-3">
+          <p className="type-micro">Raised</p>
+          <div className="rule--fade my-2" />
+          <p className="type-value">The details panel.</p>
+        </Raised>
+      </Section>
+      <Section title="Tooltip, loading">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="btn-thin">
+              Hover me
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Version 0.2.1 is available</TooltipContent>
+        </Tooltip>
+        <span className="type-body flex items-center">
+          Still checking 1 teammate
+          <Loader />
+        </span>
+        <span className="skeleton h-3 w-20" />
+        <span className="skeleton h-5 w-24" style={{ borderRadius: 16 }} />
+      </Section>
+      <Section title="Empty state">
+        <div className="flex h-72 w-96 border border-hairline">
+          <EmptyState title="Open League of Legends">
+            Expose connects on its own when the client starts.
+          </EmptyState>
+        </div>
+      </Section>
+    </>
+  );
+}
+
 export default function Gallery() {
   return (
     <TooltipProvider>
       <main className="flex h-full flex-col gap-6 overflow-y-auto p-4">
         <Controls />
+        <Pieces />
         <Section title="Mark">
           <Item label="40">
             <Mark size={40} />

@@ -1,40 +1,34 @@
-import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
+import { WarnGlyph } from "@/components/art/glyphs";
 import { cn } from "@/lib/utils";
 
-// a small tinted tag: red flags, amber warnings, the "likely" match marker. a
-// flag's severity maps onto the tone directly, with "info" shown as neutral.
-const chipVariants = cva(
-  "inline-flex h-5 max-w-full shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap [&_svg]:size-3 [&_svg]:shrink-0",
-  {
-    variants: {
-      tone: {
-        neutral: "bg-surface-raised text-fg-secondary",
-        accent: "bg-accent/15 text-accent",
-        red: "bg-red-bg text-red",
-        amber: "bg-amber-bg text-amber",
-        green: "bg-green-bg text-green",
-      },
-    },
-    defaultVariants: {
-      tone: "neutral",
-    },
-  },
-);
+export type ChipTone = "red" | "amber" | "neutral" | "info" | "soft";
 
-type ChipTone = NonNullable<VariantProps<typeof chipVariants>["tone"]>;
-
-type ChipProps = ComponentProps<"span"> & VariantProps<typeof chipVariants>;
-
+// the notice pill for flags: red and amber flags carry the warning glyph.
 // long labels truncate instead of widening the row; pass a title for the full
-// text when that can happen.
-function Chip({ className, tone, children, ...props }: ChipProps) {
+// text when that can happen. other props reach the span, so a chip can be a
+// tooltip's trigger.
+function Chip({
+  tone,
+  warn = false,
+  className,
+  children,
+  ...props
+}: ComponentProps<"span"> & { tone: ChipTone; warn?: boolean }) {
   return (
-    <span className={cn(chipVariants({ tone }), className)} {...props}>
-      {typeof children === "string" ? <span className="truncate">{children}</span> : children}
+    <span className={cn("chip", `chip--${tone}`, className)} {...props}>
+      {warn && <WarnGlyph />}
+      <span>{children}</span>
     </span>
   );
 }
 
-export { Chip, chipVariants, type ChipTone };
+export type TagTone = "gold" | "amber" | "teal" | "red";
+
+// a small square tag, for "likely".
+function Tag({ tone, className, ...props }: ComponentProps<"span"> & { tone: TagTone }) {
+  return <span className={cn("tag", `tag--${tone}`, className)} {...props} />;
+}
+
+export { Chip, Tag };

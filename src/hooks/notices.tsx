@@ -14,10 +14,14 @@ import type { Notice } from "@/types";
 
 export interface Toast extends Notice {
   id: number;
+  // fading out, about to go.
+  leaving?: boolean;
 }
 
 // errors stay a little longer than plain information, so they can be read.
-const LIFETIME_MS = { info: 4000, error: 6000 } as const;
+const LIFETIME_MS = { info: 4000, error: 7000 } as const;
+// how long a toast takes to fade out (see .toast[data-leaving]).
+const FADE_MS = 400;
 
 const PushContext = createContext<(notice: Notice) => void>(() => {});
 const ToastContext = createContext<{ toasts: Toast[]; dismiss: (id: number) => void }>({
@@ -44,10 +48,19 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(0);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
+  // fades the toast out, then removes it.
   const dismiss = useCallback((id: number) => {
     clearTimeout(timers.current.get(id));
-    timers.current.delete(id);
-    setToasts((current) => current.filter((toast) => toast.id !== id));
+    setToasts((current) =>
+      current.map((toast) => (toast.id === id ? { ...toast, leaving: true } : toast)),
+    );
+    timers.current.set(
+      id,
+      setTimeout(() => {
+        timers.current.delete(id);
+        setToasts((current) => current.filter((toast) => toast.id !== id));
+      }, FADE_MS),
+    );
   }, []);
 
   const push = useCallback(
@@ -55,11 +68,11 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
       const id = nextId.current++;
       setToasts((current) => {
         // the same message twice in a row is one toast, not a stack.
-        if (current.some((toast) => toast.message === notice.message)) {
+        if (current.some((toast) => toast.message === notice.message && !toast.leaving)) {
           return current;
         }
-        // at most three at once, so a burst cannot cover the window.
-        return [...current.slice(-2), { ...notice, id }];
+        // at most two at once, so a burst cannot cover the window.
+        return [...current.slice(-1), { ...notice, id }];
       });
       timers.current.set(
         id,

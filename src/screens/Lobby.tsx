@@ -1,4 +1,3 @@
-import { Users } from "lucide-react";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import { LobbySummary } from "@/components/lobby/LobbySummary";
@@ -27,7 +26,7 @@ export function Lobby({
 }) {
   if (!lobby) {
     return (
-      <EmptyState icon={Users} title="Champ select">
+      <EmptyState title="Champ select">
         Your teammates show up here in a moment.
       </EmptyState>
     );
@@ -195,7 +194,9 @@ function Unmatched({ names }: { names: NameView[] }) {
           const text = riotId(name);
           return (
             <li key={text} className="flex min-w-0">
-              <Chip title={text}>{text}</Chip>
+              <Chip tone="neutral" title={text}>
+                {text}
+              </Chip>
             </li>
           );
         })}

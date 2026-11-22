@@ -713,3 +713,412 @@
     transform: scale(1);
   }
 }
+
+/*
+  the display pieces: flag chips and tags, the header status, frames and
+  panels, dividers, tooltips, toasts, loading marks and empty states.
+*/
+@layer components {
+  /* the lobby notice pill, for flags: colored text and a warning glyph on a
+     grey pill. red flags get a dark red fill too, a second cue besides hue. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    max-width: 100%;
+    padding: 2px 8px;
+    box-sizing: border-box;
+    background: var(--amber-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .chip > svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .chip > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chip--red {
+    color: var(--red);
+    background: #2a1015;
+    border-color: rgba(255, 35, 69, 0.2);
+  }
+  .chip--amber {
+    color: var(--amber);
+  }
+  .chip--info {
+    color: var(--blue-1);
+  }
+  .chip--soft {
+    color: var(--amber-soft);
+  }
+  .chip--neutral {
+    color: var(--text-secondary);
+  }
+
+  /* a small square tag, for "likely". */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-xs);
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .tag--gold {
+    background: var(--tag-gold-bg);
+    color: var(--tag-gold-text);
+  }
+  .tag--amber {
+    background: var(--amber-bg);
+    color: var(--amber);
+  }
+  .tag--teal {
+    background: var(--blue-5);
+    color: var(--blue-2);
+  }
+  .tag--red {
+    background: var(--red-tag-bg);
+    color: var(--red-tag-text);
+  }
+
+  /* a counter on gold. */
+  .count {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    padding: 0 6px;
+    border-radius: var(--radius-badge);
+    background: var(--gold-4);
+    color: var(--on-accent);
+    font: 700 12px/16px var(--font-body);
+  }
+
+  /* the header status: a dot and a label, no container. */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--text-secondary);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 2px solid #5b5a56;
+    background: var(--bg);
+    box-shadow: var(--halo-dot);
+  }
+  .status[data-state="connected"] {
+    color: var(--green);
+  }
+  .status[data-state="connected"] .status-dot {
+    background: var(--green-bg);
+    border-color: var(--green-ring);
+  }
+  .status[data-state="champ-select"] {
+    color: var(--status-game);
+  }
+  .status[data-state="champ-select"] .status-dot {
+    background: var(--status-game-bg);
+    border-color: var(--win);
+  }
+
+  /* the gold frame around a card: a 2px gradient edge, brightest on the side
+     that faces the card's actions (bottom) or what it points at (top). */
+  .frame {
+    position: relative;
+    background: var(--bg);
+    border: 2px solid transparent;
+    border-image: var(--frame-b) 1 stretch;
+    box-shadow: var(--shadow-frame);
+  }
+  .frame::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    box-shadow: var(--shadow-frame-glow);
+    pointer-events: none;
+  }
+  .frame--top {
+    border-image-source: var(--frame-t);
+  }
+  /* trim lines just outside a frame's top and bottom edges. */
+  .frame-lips {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .frame-lips::before,
+  .frame-lips::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    height: 0;
+    box-sizing: border-box;
+    border-style: solid;
+    border-width: 4px 4px 0;
+    border-image-width: 4px 4px 0;
+    border-image-slice: 4 4 0;
+    border-image-repeat: stretch;
+  }
+  .frame-lips::before {
+    top: -6px;
+    border-image-source: url("../assets/art/lip-top.svg");
+  }
+  .frame-lips::after {
+    bottom: -6px;
+    border-image-source: url("../assets/art/lip-bottom.svg");
+  }
+  /* a quiet container with a thin dark edge. */
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--border-window);
+  }
+  /* a raised card on a lighter face, bright at the top: the details panel. */
+  .raised {
+    position: relative;
+    background: var(--surface);
+    border: 2px solid transparent;
+    border-image: var(--frame-t) 1 stretch;
+    filter: drop-shadow(0 0 1px #000);
+  }
+
+  /* dividers. */
+  .rule {
+    height: 1px;
+    background: var(--hairline);
+  }
+  .rule--fade {
+    height: 0;
+    border-top: 1px solid transparent;
+    border-image: var(--divider) 1;
+  }
+  .rule--center {
+    height: 2px;
+    background: var(--divider-center);
+  }
+  .rule--v {
+    width: 1px;
+    align-self: stretch;
+    background: var(--divider-v);
+    opacity: 0.6;
+  }
+
+  /* tooltip: a dark card in a gold frame, bright toward its target, with a
+     caret that opens the frame where it points. */
+  .tip {
+    z-index: 50;
+    box-sizing: border-box;
+    margin: 1px;
+    max-width: 266px;
+    padding: 7px 9px;
+    background: var(--surface);
+    border: 2px solid transparent;
+    border-image: var(--frame-b) 1 stretch;
+    box-shadow: var(--shadow-frame);
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--text-secondary);
+    text-align: center;
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .tip[data-side="bottom"] {
+    border-image-source: var(--frame-t);
+  }
+  .tip[data-side="right"] {
+    border-image-source: var(--frame-l);
+  }
+  .tip[data-side="left"] {
+    border-image-source: var(--frame-r);
+  }
+  .tip--rich {
+    min-width: 166px;
+    padding: 18px;
+  }
+  .tip[data-state="delayed-open"] {
+    animation: fade-in 150ms linear;
+  }
+  .tip[data-state="closed"] {
+    animation: fade-out 150ms linear;
+  }
+  .tip-caret {
+    display: block;
+    margin-top: -3px;
+    filter: var(--shadow-caret);
+  }
+
+  /* toast: a framed card at the bottom of the window, with trim. */
+  .toast {
+    position: relative;
+    width: 320px;
+    max-width: calc(100% - 32px);
+    box-sizing: border-box;
+    background: var(--bg);
+    border: 2px solid transparent;
+    border-image: var(--frame-b) 1 stretch;
+    box-shadow: var(--shadow-frame);
+    animation: fade-in 400ms var(--ease-toast);
+  }
+  .toast::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    box-shadow: var(--shadow-frame-glow);
+    pointer-events: none;
+  }
+  .toast[data-leaving] {
+    animation: fade-out 400ms var(--ease-toast) forwards;
+  }
+  .toast-body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    padding: 18px 36px;
+    text-align: center;
+  }
+  .toast--error .toast-body {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .toast-body > svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--red);
+  }
+  .toast-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-plate);
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--gold-1);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .toast-close svg {
+    width: 16px;
+    height: 16px;
+  }
+  .toast-close:hover,
+  .toast-close:focus-visible {
+    background: rgba(10, 20, 40, 0.5);
+  }
+
+  /* the three dots that bounce while something is still being worked on. */
+  .loader {
+    display: inline-flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 16px;
+    margin: 0 6px 0 8px;
+    vertical-align: middle;
+  }
+  .loader > i {
+    width: 4px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--gold-1);
+    animation: loader-bounce 1s ease infinite;
+  }
+  .loader > i:nth-child(1) {
+    animation-delay: -0.2s;
+  }
+  .loader > i:nth-child(2) {
+    animation-delay: -0.1s;
+  }
+
+  /* a calm message for a screen with nothing to show yet. */
+  .empty {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 18px 80px;
+    text-align: center;
+  }
+  .empty-title {
+    margin-top: 24px;
+  }
+  .empty-text {
+    margin-top: 8px;
+    max-width: 288px;
+    text-wrap: balance;
+  }
+  .empty-actions {
+    margin-top: 28px;
+  }
+}
+
+/* a placeholder for a value that is still loading. size it with h-* and w-*
+   utilities. the shimmer moves a gradient with a transform, so the browser
+   never repaints the bar. */
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, #2f3b45, transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes loader-bounce {
+  0%,
+  60% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.4);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}

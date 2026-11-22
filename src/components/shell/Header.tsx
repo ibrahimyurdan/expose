@@ -1,21 +1,12 @@
-import { CircleArrowUp, Eye, Settings as SettingsIcon, X } from "lucide-react";
+import { Eye, Settings as SettingsIcon, X } from "lucide-react";
 import type { MouseEvent } from "react";
 
 import { IconButton } from "@/components/ui/icon-button";
-import { Pill } from "@/components/ui/pill";
+import { Status } from "@/components/ui/status";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { bridge } from "@/lib/bridge";
 import { platform } from "@/lib/platform";
 import type { ConnectionStatus, UpdateInfo } from "@/types";
-
-const STATUS: Record<
-  ConnectionStatus,
-  { label: string; dot: "muted" | "green" | "accent"; pulse?: boolean }
-> = {
-  waiting: { label: "Waiting for League", dot: "muted", pulse: true },
-  connected: { label: "Connected", dot: "green" },
-  champSelect: { label: "Champ select", dot: "accent" },
-};
 
 // the 44px bar across the top: the wordmark, the connection state, an update
 // notice when a newer release exists, and the settings button. on macos the
@@ -37,7 +28,6 @@ export function Header({
   minimal?: boolean;
 }) {
   const mac = platform === "macos";
-  const state = status ? STATUS[status] : null;
   // tauri zooms the window when its drag region is double-clicked, which
   // would blow this small always-on-top panel up over the league client. the
   // drag script listens on the document, so stopping the double-click here
@@ -61,26 +51,19 @@ export function Header({
       </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
-        {state ? (
-          <Pill dot={state.dot} pulse={state.pulse} role="status" className="min-w-0">
-            {state.label}
-          </Pill>
-        ) : null}
+        <Status state={status} />
 
         {!minimal && update?.available ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Pill asChild tone="accent">
-                <button
-                  type="button"
-                  onClick={() => bridge.openExternal(update.url).catch(() => {})}
-                  aria-label={`Update to version ${update.latest}`}
-                  className="hover:border-accent/60 hover:bg-accent/15"
-                >
-                  <CircleArrowUp aria-hidden />
-                  Update
-                </button>
-              </Pill>
+              <button
+                type="button"
+                className="btn-text"
+                onClick={() => bridge.openExternal(update.url).catch(() => {})}
+                aria-label={`Update to version ${update.latest}`}
+              >
+                Update
+              </button>
             </TooltipTrigger>
             <TooltipContent>Version {update.latest} is available</TooltipContent>
           </Tooltip>

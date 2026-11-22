@@ -1,8 +1,8 @@
 import { Users, Zap } from "lucide-react";
 import { useId } from "react";
 
-import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
+import { Panel } from "@/components/ui/frame";
 import { Switch } from "@/components/ui/switch";
 import type { LastLobby } from "@/hooks/useLobby";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
@@ -27,7 +27,7 @@ export function Idle({
     // states.
     <div className="flex flex-1 flex-col justify-center gap-6 px-4 pt-4 pb-16">
       <div className="flex flex-col gap-3">
-        <Card className="flex items-center gap-3 p-4">
+        <Panel className="flex items-center gap-3 p-4">
           <span
             aria-hidden
             className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent/10 text-accent"
@@ -50,7 +50,7 @@ export function Idle({
             aria-labelledby={`${id}-title`}
             aria-describedby={`${id}-hint`}
           />
-        </Card>
+        </Panel>
         <p className="flex items-center gap-2 px-1 text-sm text-fg-secondary">
           <Users className="size-4 shrink-0 text-fg-muted" aria-hidden />
           When champ select starts, your teammates show up here.
@@ -86,7 +86,7 @@ function LastLobbyCard({ last }: { last: LastLobby }) {
           {timeAgo(last.endedAt, now)}
         </span>
       </div>
-      <Card className="flex flex-col gap-2 p-4">
+      <Panel className="flex flex-col gap-2 p-4">
         <div className="flex items-center justify-between gap-3">
           <span className="truncate text-base font-medium text-fg">{queueName(lobby.queueId)}</span>
           <SummaryChip lobby={lobby} />
@@ -94,7 +94,7 @@ function LastLobbyCard({ last }: { last: LastLobby }) {
         <p className="truncate text-sm text-fg-secondary" title={names.join(", ")}>
           {names.length > 0 ? names.join(" · ") : "Teammate names stayed hidden."}
         </p>
-      </Card>
+      </Panel>
     </section>
   );
 }
@@ -107,11 +107,11 @@ function SummaryChip({ lobby }: { lobby: LobbyView }) {
   const checked = teammates.filter((player) => player.stats?.historyLoaded === true).length;
   const flagged = summary.redFlags > 0 || summary.warnings > 0;
   const all = teammates.length > 0 && checked === teammates.length;
-  const tone = summary.redFlags > 0 ? "red" : summary.warnings > 0 ? "amber" : all ? "green" : "neutral";
+  const tone = summary.redFlags > 0 ? "red" : summary.warnings > 0 ? "amber" : "neutral";
   const label =
     flagged || all ? capitalize(summary.label) : checked === 0 ? "Not checked" : "Partly checked";
   return (
-    <Chip tone={tone} title={label}>
+    <Chip tone={tone} warn={tone !== "neutral"} title={label}>
       {label}
     </Chip>
   );
