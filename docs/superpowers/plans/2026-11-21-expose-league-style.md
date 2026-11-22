@@ -61,7 +61,7 @@ frontend (`src/`):
 
 ---
 
-### task 1: the champ select stage, turn and phase length
+### Task 1: the champ select stage, turn and phase length
 
 **Files:**
 - Modify: `src-tauri/src/lobby/session.rs` (structs 13–87, tests 149–269)
@@ -102,7 +102,7 @@ frontend (`src/`):
 - [ ] **Step 6: run** `zsh .claude/design/checks.sh` → PASS, with the new tests among 111+.
 - [ ] **Step 7: commit** `lobby: read the champ select stage, turn and phase length` with the four files.
 
-### task 2: a quieter backend
+### Task 2: a quieter backend
 
 **Files:**
 - Modify: `src-tauri/src/lcu/mod.rs` (supervise 65–98, wait_for_next_attempt 200–210, run_session 100–139)
@@ -126,7 +126,7 @@ frontend (`src/`):
 - [ ] **Step 5: run** checks → PASS. preview `?screen=lobby`: champion squares still show.
 - [ ] **Step 6: commit** `app: scan for league less often, skip unchanged lobbies, push champion data`.
 
-### task 3: faster champ select
+### Task 3: faster champ select
 
 **Files:**
 - Modify: `src-tauri/src/lobby/mod.rs` (constants 41–50, LobbyState 57–93, update 227–247, stats_arrived 253–274, resolve 321–399, chat_due 413, read_chat 439–459, chat_arrived 463–503, tests 1027–1094)
@@ -146,7 +146,7 @@ frontend (`src/`):
 - [ ] **Step 4: run** checks → PASS (`partial_stats_when_history_fails` still gives `complete == false`).
 - [ ] **Step 5: commit** `lobby: read names faster and show ranks before history`.
 
-### task 4: a smaller, safer build
+### Task 4: a smaller, safer build
 
 **Files:**
 - Create: `src-tauri/src/tls.rs`
@@ -175,7 +175,7 @@ frontend (`src/`):
 - [ ] **Step 8: ci:** delete the nasm steps and the aws-lc comment.
 - [ ] **Step 9: commit** `app: smaller release build, ring for tls, lighter dependencies`.
 
-### task 5: the window, built in rust
+### Task 5: the window, built in rust
 
 the chrome does not change yet (task 10 flips it with the new title bar): both platforms keep their system title bar here, so every commit stays usable.
 
@@ -206,7 +206,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 5: run** checks → PASS. `npm run tauri dev` on mac: the window appears once the first screen has painted, with no white frame; the v0.2 ui on an opaque background; close hides; the dock reopens it; the window remembers its size and position.
 - [ ] **Step 6: commit** `app: build the window in rust and show it once painted`.
 
-### task 6: the ui foundation
+### Task 6: the ui foundation
 
 **Files:**
 - Create: `src/assets/fonts/` (woff2 files, `OFL-Cinzel.txt`, `OFL-SourceSans3.txt`), `src/styles/{fonts,tokens,base,type}.css`, `src/lib/platform.ts`, `tests/ui/platform.test.ts`
@@ -244,7 +244,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 9: run** `npm run test:ui && npm run build`, then check the preview at `?screen=lobby&platform=windows` and `&platform=mac`: navy and gold, cinzel and source sans (`document.fonts.check('700 14px "Expose Display"')` is true). add `npm run test:ui` to the ci frontend job.
 - [ ] **Step 10: commit** `ui: league tokens, fonts, type roles and platform detection`.
 
-### task 7: our drawings and the dev gallery
+### Task 7: our drawings and the dev gallery
 
 **Files:**
 - Create: `src/components/art/{Mark,glyphs,MetalWork,DodgeShape,Ornament,PositionGlyph,RankCrest}.tsx`, `src/assets/art/{lip-top,lip-bottom,row-diamond}.svg` (copied from the reference mockup, our own drawings), `src/dev/Gallery.tsx`
@@ -260,7 +260,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 2: run** `npm run build`; open `?screen=gallery` and compare each drawing with the reference renders.
 - [ ] **Step 3: commit** `ui: our own league-style drawings`.
 
-### task 8: interactive controls
+### Task 8: interactive controls
 
 **Files:**
 - Create: `src/styles/controls.css` (first part), `src/components/ui/{checkbox,switch,radio-group,select}.tsx`
@@ -281,7 +281,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 3: run** `npm run build`; in the gallery, tab through every control and check the focus ring and keyboard use.
 - [ ] **Step 4: commit** `ui: league buttons, toggles, radios and dropdown`.
 
-### task 9: display pieces
+### Task 9: display pieces
 
 **Files:**
 - Modify: `src/styles/controls.css` (chip, tag, count, status, frame, lips, panel, raised, rules, tooltip, toast, skeleton, loader, empty state, scroll fade), `src/components/ui/{chip,tooltip,empty-state}.tsx`, `src/components/shell/Notices.tsx`, `src/hooks/notices.tsx` (LIFETIME_MS error 7000; at most two), `src/components/shell/Header.tsx` (Pill → Status), `src/screens/{Idle,Settings}.tsx` (Card → Panel), `src/index.css` (skeleton moves to controls.css), `src/dev/Gallery.tsx`
@@ -302,7 +302,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 2: run** `npm run build`. preview `?notice=1`: the toast fades in and out with no slide. tooltips show after 450 ms. block the font files in devtools and reload the gallery and `?screen=lobby`: the layout holds on the fallback stacks (review focus 5).
 - [ ] **Step 3: commit** `ui: league chips, frames, tooltips and toasts`.
 
-### task 10: the league title bar and the window chrome per platform
+### Task 10: the league title bar and the window chrome per platform
 
 **Files:**
 - Create: `src/components/shell/{TitleBar,WindowEdge}.tsx`, `src/styles/shell.css`
@@ -332,7 +332,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 4: mac app** (`npm run tauri dev`): no traffic lights; minimize goes to the dock; the dock icon brings the window back with the lights still hidden; settings toggles; close hides and the dock reopens; ⌘, toggles settings; dragging the strip moves the window; a double-click does not zoom; no white flash at launch.
 - [ ] **Step 5: commit** `ui: league title bar and window chrome per platform`.
 
-### task 11: the lobby band, verdict and dodge
+### Task 11: the lobby band, verdict and dodge
 
 **Files:**
 - Create: `src/lib/band.ts`, `tests/ui/band.test.ts`, `src/components/lobby/Band.tsx`
@@ -384,7 +384,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
   - a full confirm and dodge with the keyboard.
 - [ ] **Step 5: commit** `lobby: league band, verdict and dodge`.
 
-### task 12: player rows and details
+### Task 12: player rows and details
 
 **Files:**
 - Modify: `src/components/lobby/{PlayerRow,PlayerDetail,RankBadge,FormDots,ChampionIcon}.tsx`, `src/styles/lobby.css` (rows 429–480; the details panel from `style-spec.md` section 5), `src/dev/fixtures.ts` + `src/dev/preview.ts` (variants "long" and "aram")
@@ -417,7 +417,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 2: run** `npm run build`. preview every lobby variant on both platforms at 460 x 680 and 420 x 600: ranked, guess, resolving, hidden, normal, live, pick, long and aram. check each row's line heights before and after stats land (`?lobby=live`), and open the details on one row per variant.
 - [ ] **Step 3: commit** `lobby: league player rows and details`.
 
-### task 13: waiting, idle, welcome, settings and riot's notice
+### Task 13: waiting, idle, welcome, settings and riot's notice
 
 **Files:**
 - Create: `src/components/shell/{RiotNotice,FontCredits}.tsx`, `src/styles/screens.css` (settings 481–499 plus the welcome and idle recipes from `style-spec.md` section 3)
@@ -456,7 +456,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
   - `?screen=settings` with `?update=0`, `?update=failed` and the default update.
 - [ ] **Step 3: commit** `ui: league welcome, waiting, idle and settings, with riot's notice`.
 
-### task 14: drop v0.2's leftovers
+### Task 14: drop v0.2's leftovers
 
 **Files:**
 - Modify: `src/styles/tokens.css` (the legacy aliases go), any component still using legacy classes, `package.json` (`lucide-react`, `tw-animate-css` and `class-variance-authority` go if nothing imports them)
@@ -466,7 +466,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 3:** preview every screen once more on both platforms to confirm nothing lost its style.
 - [ ] **Step 4: commit** `ui: drop the v0.2 tokens and unused packages`.
 
-### task 15: windows webview memory while hidden
+### Task 15: windows webview memory while hidden
 
 **Files:**
 - Modify: `src-tauri/src/window.rs`, `src-tauri/src/main.rs` (reveal_main_window), `src-tauri/Cargo.toml` (windows-only `webview2-com = "0.38"`)
@@ -479,7 +479,7 @@ the chrome does not change yet (task 10 flips it with the new title bar): both p
 - [ ] **Step 2: run** checks → PASS (the windows cross-check compiles it).
 - [ ] **Step 3: commit** `app: lower webview memory while hidden on windows`.
 
-### task 16: verify everything
+### Task 16: verify everything
 
 - [ ] **Step 1:** `zsh .claude/design/checks.sh` → PASS.
 - [ ] **Step 2: screenshots** with `.claude/design/shoot.mjs`, adapted to add `&platform=`, into the scratchpad: every screen and lobby variant on both platforms at 460 x 680 and 420 x 600. compare them with the reference renders and fix what differs.
