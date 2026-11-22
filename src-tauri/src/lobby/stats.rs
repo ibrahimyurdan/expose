@@ -305,29 +305,76 @@ pub struct Fetched {
     pub complete: bool,
 }
 
-// fetches one player's stats. the four requests go out together, each once
-// the limit, shared by every player being fetched, has room for it.
-pub async fn fetch_stats(client: &LcuClient, puuid: &str, limit: &Semaphore) -> Fetched {
+// the quick half of one player's stats: the summoner and ranked answers,
+// which come back long before the match history.
+#[derive(Debug, Clone, Default)]
+pub struct Quick {
+    puuid: String,
+    summoner: Option<Summoner>,
+    ranked: Option<RankedStats>,
+}
+
+impl Quick {
+    // what the quick half alone says: level, name and rank, no history.
+    pub fn stats(&self) -> PlayerStats {
+        PlayerStats::from_parts(
+            self.summoner.clone(),
+            self.ranked.clone(),
+            None,
+            None,
+            &self.puuid,
+        )
+    }
+}
+
+// fetches a player's summoner and ranked stats, both at once, each once the
+// limit, shared by every player being fetched, has room for it.
+pub async fn fetch_quick(client: &LcuClient, puuid: &str, limit: &Semaphore) -> Quick {
     // nothing but a well formed puuid goes into a request path.
+    if parse_uuid(puuid).is_none() {
+        return Quick {
+            puuid: puuid.to_string(),
+            ..Quick::default()
+        };
+    }
+    let (summoner, ranked) = tokio::join!(
+        limited(limit, client.summoner_by_puuid(puuid)),
+        limited(limit, client.ranked_stats(puuid)),
+    );
+    Quick {
+        puuid: puuid.to_string(),
+        summoner: loaded("summoner", summoner),
+        ranked: loaded("ranked stats", ranked),
+    }
+}
+
+// fetches the rest of a player's stats, the match history and the mastery,
+// and puts them together with the quick half. complete only when all four
+// requests went through.
+pub async fn fetch_rest(
+    client: &LcuClient,
+    puuid: &str,
+    limit: &Semaphore,
+    quick: Quick,
+) -> Fetched {
     if parse_uuid(puuid).is_none() {
         return Fetched {
             stats: PlayerStats::default(),
             complete: false,
         };
     }
-    let (summoner, ranked, history, mastery) = tokio::join!(
-        limited(limit, client.summoner_by_puuid(puuid)),
-        limited(limit, client.ranked_stats(puuid)),
+    let (history, mastery) = tokio::join!(
         limited(limit, client.match_history(puuid, HISTORY_GAMES)),
         limited(limit, client.champion_mastery(puuid)),
     );
-    let summoner = loaded("summoner", summoner);
-    let ranked = loaded("ranked stats", ranked);
     let history = loaded("match history", history);
     let mastery = loaded("champion mastery", mastery);
-    let complete = summoner.is_some() && ranked.is_some() && history.is_some() && mastery.is_some();
+    let complete = quick.summoner.is_some()
+        && quick.ranked.is_some()
+        && history.is_some()
+        && mastery.is_some();
     Fetched {
-        stats: PlayerStats::from_parts(summoner, ranked, history, mastery, puuid),
+        stats: PlayerStats::from_parts(quick.summoner, quick.ranked, history, mastery, puuid),
         complete,
     }
 }

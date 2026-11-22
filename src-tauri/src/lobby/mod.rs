@@ -33,15 +33,19 @@ use identity::{
     SlotHint,
 };
 use session::{is_blank, Acting, Session, SessionPlayer, Stage};
-use stats::{fetch_stats, Fetched, PlayerStats, Position, StatsCache};
+use stats::{fetch_quick, fetch_rest, Fetched, PlayerStats, Position, StatsCache};
 use view::{build_view, LobbyView, ScoutContext};
 
 // while a hidden teammate has no exact match, the riot client's chat is read
-// again at most this often.
+// again at most this often: quickly while the room fills at the start of the
+// lobby, then every couple of seconds.
+const CHAT_EARLY_EVERY: Duration = Duration::from_millis(500);
+const CHAT_EARLY_FOR: Duration = Duration::from_secs(5);
 const CHAT_EVERY: Duration = Duration::from_secs(2);
-// reads of an empty chat (the riot client joins the room a moment after champ
-// select starts) before a hidden slot stops showing as being matched.
-const CHAT_PATIENCE: u32 = 5;
+// how long after the first read an empty chat (the riot client joins the room
+// a moment after champ select starts) still counts as filling, before a hidden
+// slot stops showing as being matched.
+const CHAT_PATIENCE: Duration = Duration::from_secs(10);
 // any champ select chat room has this in its conversation id.
 const CHAMP_SELECT_ROOM: &str = "champ-select";
 // what the toast says when the names in a ranked lobby cannot be read.
@@ -66,6 +70,9 @@ pub struct LobbyState {
     pub stats: HashMap<String, PlayerStats>,
     // puuids whose stats are being fetched.
     pub pending: HashSet<String>,
+    // the quick half (summoner and rank) of stats still being fetched, keyed
+    // like stats. kept apart so the slot guesses only ever see full stats.
+    pub quick: HashMap<String, PlayerStats>,
     // the names came from this lobby's own chat room, not the champ select
     // fallback (see lobby_candidates).
     pub candidates_from_room: bool,
@@ -76,7 +83,8 @@ pub struct LobbyState {
     pub matching: HashSet<String>,
     // when the chat was last read, and how it went.
     pub participants_fetched_at: Option<Instant>,
-    pub chat_reads: u32,
+    // the first read that came back, for the read pace and the patience.
+    pub chat_started: Option<Instant>,
     pub chat_failed: bool,
     // a chat reader runs for this lobby (see read_chat).
     pub chat_reading: bool,
@@ -101,6 +109,21 @@ impl LobbyState {
             game_id,
             ..LobbyState::default()
         };
+    }
+
+    // the summoner and rank of a player still being fetched are in. they
+    // show straight away; the player stays pending until the rest arrives.
+    pub fn record_quick(&mut self, puuid: &str, stats: PlayerStats) {
+        if self.pending.contains(puuid) {
+            self.quick.insert(puuid.to_string(), stats);
+        }
+    }
+
+    // a player's full stats are in.
+    pub fn record_full(&mut self, puuid: &str, stats: PlayerStats) {
+        self.pending.remove(puuid);
+        self.quick.remove(puuid);
+        self.stats.insert(puuid.to_string(), stats);
     }
 
     // follows a session to its lobby. a new game id (a requeue, or the first
@@ -241,9 +264,25 @@ fn update(app: &AppHandle, client: &LcuClient) {
         let app = app.clone();
         let client = client.clone();
         tauri::async_runtime::spawn(async move {
-            let fetched = fetch_stats(&client, &puuid, &STATS_REQUESTS).await;
+            // the summoner and rank answer fast, so they show first.
+            let quick = fetch_quick(&client, &puuid, &STATS_REQUESTS).await;
+            quick_arrived(&app, game_id, &puuid, quick.stats());
+            let fetched = fetch_rest(&client, &puuid, &STATS_REQUESTS, quick).await;
             stats_arrived(&app, game_id, puuid, fetched);
         });
+    }
+    publish(app);
+}
+
+// one player's summoner and rank are in: show them while the rest loads.
+fn quick_arrived(app: &AppHandle, game_id: i64, puuid: &str, stats: PlayerStats) {
+    let state = app.state::<AppState>();
+    {
+        let mut lobby = state.lobby.lock();
+        if lobby.game_id != game_id {
+            return;
+        }
+        lobby.record_quick(puuid, stats);
     }
     publish(app);
 }
@@ -268,8 +307,7 @@ fn stats_arrived(app: &AppHandle, game_id: i64, puuid: String, fetched: Fetched)
         if lobby.game_id != game_id {
             return;
         }
-        lobby.pending.remove(&puuid);
-        lobby.stats.insert(puuid, stats);
+        lobby.record_full(&puuid, stats);
         resolve(&mut lobby, reveal);
     }
     publish(app);
@@ -396,8 +434,11 @@ fn resolve(lobby: &mut LobbyState, reveal: bool) {
         }
     }
     // the chat has not named anyone yet but may still, or a guess is waiting.
-    let names_due =
-        lobby.candidates.is_empty() && !lobby.chat_failed && lobby.chat_reads < CHAT_PATIENCE;
+    let names_due = lobby.candidates.is_empty()
+        && !lobby.chat_failed
+        && lobby
+            .chat_started
+            .is_none_or(|started| started.elapsed() < CHAT_PATIENCE);
     lobby.matching = if reveal && (names_due || waiting) {
         open.iter()
             .map(|slot| slot.key.clone())
@@ -421,12 +462,29 @@ fn slot_hint(player: &SessionPlayer) -> SlotHint {
 }
 
 // the chat is worth reading while a hidden teammate has no exact match (a
-// guess may still turn exact), at most every couple of seconds.
+// guess may still turn exact), at the pace chat_interval sets.
 fn chat_due(lobby: &LobbyState, now: Instant) -> bool {
+    let every = chat_interval(chat_age(lobby, now));
     let rested = lobby
         .participants_fetched_at
-        .is_none_or(|at| now.saturating_duration_since(at) >= CHAT_EVERY);
+        .is_none_or(|at| now.saturating_duration_since(at) >= every);
     needs_chat(lobby) && rested
+}
+
+// how long since the chat first answered in this lobby, zero before it has.
+fn chat_age(lobby: &LobbyState, now: Instant) -> Duration {
+    lobby.chat_started.map_or(Duration::ZERO, |started| {
+        now.saturating_duration_since(started)
+    })
+}
+
+// quick reads while the room fills at the start of the lobby, then slower.
+fn chat_interval(since_first_read: Duration) -> Duration {
+    if since_first_read < CHAT_EARLY_FOR {
+        CHAT_EARLY_EVERY
+    } else {
+        CHAT_EVERY
+    }
 }
 
 fn needs_chat(lobby: &LobbyState) -> bool {
@@ -466,7 +524,12 @@ async fn read_chat(app: &AppHandle, client: &LcuClient, game_id: i64) {
         if !chat_arrived(app, client, game_id, read) {
             return;
         }
-        tokio::time::sleep(CHAT_EVERY).await;
+        let every = {
+            let state = app.state::<AppState>();
+            let lobby = state.lobby.lock();
+            chat_interval(chat_age(&lobby, Instant::now()))
+        };
+        tokio::time::sleep(every).await;
     }
 }
 
@@ -493,7 +556,7 @@ fn chat_arrived(
             match read {
                 Some((names, from_room)) => {
                     lobby.chat_failed = false;
-                    lobby.chat_reads = lobby.chat_reads.saturating_add(1);
+                    lobby.chat_started.get_or_insert_with(Instant::now);
                     changed = merge_candidates(&mut lobby, names, from_room);
                 }
                 None => lobby.chat_failed = true,
@@ -765,6 +828,78 @@ mod tests {
             session: Some(session),
             ..LobbyState::default()
         }
+    }
+
+    #[test]
+    fn reads_fast_at_first_then_slower() {
+        assert_eq!(chat_interval(Duration::ZERO), Duration::from_millis(500));
+        assert_eq!(
+            chat_interval(Duration::from_secs(1)),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            chat_interval(Duration::from_secs(5)),
+            Duration::from_secs(2)
+        );
+        assert_eq!(
+            chat_interval(Duration::from_secs(6)),
+            Duration::from_secs(2)
+        );
+    }
+
+    #[test]
+    fn ranks_show_before_history() {
+        let session = ranked();
+        let mut state = lobby(ranked());
+        state.identities.insert(
+            TOP.to_string(),
+            identity(REAL[0], "Name One", MatchKind::Key),
+        );
+        state.pending.insert(REAL[0].to_string());
+        let scout = ScoutContext {
+            provider: "opgg".to_string(),
+            region: None,
+        };
+        let view_of = |state: &mut LobbyState| {
+            let dodge = view::DodgeView {
+                armed: false,
+                lead_ms: 1500,
+            };
+            let view = build_view(&session, state, &|_| None, &scout, dodge, 0);
+            view.players
+                .into_iter()
+                .find(|player| player.key == TOP)
+                .expect("the top laner is in the lobby")
+        };
+
+        // the summoner and rank are in, the history is still on the way.
+        let quick = PlayerStats {
+            level: Some(120),
+            rank: Some(stats::Rank {
+                tier: "GOLD".to_string(),
+                division: "II".to_string(),
+                lp: 54,
+                wins: 10,
+                losses: 8,
+            }),
+            ..PlayerStats::default()
+        };
+        state.record_quick(REAL[0], quick);
+        let top = view_of(&mut state);
+        assert!(top.stats_pending);
+        let stats = top.stats.expect("the rank shows already");
+        assert_eq!(stats.rank.expect("a rank").tier, "GOLD");
+        assert!(!stats.history_loaded);
+        // flags wait for the history, and the slot guesses never see half
+        // the stats.
+        assert!(top.flags.is_empty());
+        assert!(state.stats.is_empty());
+
+        state.record_full(REAL[0], played(Position::Top, 266, (4, 12)));
+        let top = view_of(&mut state);
+        assert!(!top.stats_pending);
+        assert!(top.stats.expect("stats").history_loaded);
+        assert!(state.quick.is_empty());
     }
 
     #[test]
@@ -1077,16 +1212,17 @@ mod tests {
         assert!(state.matching.is_empty());
 
         // empty reads while the riot client joins the room: still matching,
-        // until it has had its chances.
-        state.chat_reads = CHAT_PATIENCE - 1;
+        // until it has had time to.
+        let now = Instant::now();
+        state.chat_started = now.checked_sub(Duration::from_secs(9));
         resolve(&mut state, true);
         assert_eq!(state.matching, hidden);
-        state.chat_reads = CHAT_PATIENCE;
+        state.chat_started = now.checked_sub(Duration::from_secs(11));
         resolve(&mut state, true);
         assert!(state.matching.is_empty());
 
         // a failed read gives up at once (the player gets a toast).
-        state.chat_reads = 0;
+        state.chat_started = None;
         state.chat_failed = true;
         resolve(&mut state, true);
         assert!(state.matching.is_empty());
@@ -1138,13 +1274,19 @@ mod tests {
         let mut state = lobby(ranked());
         // nobody hidden is matched yet and the chat was never read.
         assert!(chat_due(&state, start));
-        // read a second ago: wait a little longer.
+        // early in the lobby the chat is read every half second.
+        state.chat_started = Some(start);
         state.participants_fetched_at = Some(start);
-        assert!(!chat_due(&state, start + Duration::from_secs(1)));
-        assert!(chat_due(&state, start + Duration::from_secs(2)));
+        assert!(!chat_due(&state, start + Duration::from_millis(300)));
+        assert!(chat_due(&state, start + Duration::from_millis(500)));
+        // once the room has settled, every couple of seconds.
+        let settled = start + Duration::from_secs(10);
+        state.participants_fetched_at = Some(settled);
+        assert!(!chat_due(&state, settled + Duration::from_secs(1)));
+        assert!(chat_due(&state, settled + Duration::from_secs(2)));
 
         // a guess is not a match, so the chat is still worth reading.
-        let later = start + Duration::from_secs(5);
+        let later = settled + Duration::from_secs(5);
         for (key, real) in [TOP, JUNGLE, BOTTOM, SUPPORT].into_iter().zip(REAL) {
             let guessed = identity(real, "Name", MatchKind::Guess);
             state.identities.insert(key.to_string(), guessed);

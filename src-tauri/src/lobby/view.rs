@@ -189,13 +189,15 @@ pub fn build_view(
         let matching = state.matching.contains(&key);
         let identity = state.identities.get(&key);
         let puuid = identity.and_then(|identity| canonical_puuid(&identity.puuid));
-        let stats = puuid.as_ref().and_then(|puuid| state.stats.get(puuid));
+        // full stats, or while those load, the quick half (summoner, rank).
+        let full = puuid.as_ref().and_then(|puuid| state.stats.get(puuid));
+        let stats = full.or_else(|| puuid.as_ref().and_then(|puuid| state.quick.get(puuid)));
         let stats_pending =
-            stats.is_none() && puuid.is_some_and(|puuid| state.pending.contains(&puuid));
+            full.is_none() && puuid.is_some_and(|puuid| state.pending.contains(&puuid));
         let identity = identity.map(|identity| identity_view(identity, stats));
 
-        // flags speak about teammates, and only once their stats are in.
-        let flags = match stats {
+        // flags speak about teammates, and only once their full stats are in.
+        let flags = match full {
             Some(stats) if !is_self => {
                 let champion = champion_name(champion_id);
                 flags_for(&FlagInput {
