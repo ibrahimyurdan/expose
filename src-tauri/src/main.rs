@@ -1,6 +1,7 @@
 // hide the extra console window on windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod art;
 mod commands;
 mod ddragon;
 mod error;
@@ -15,6 +16,7 @@ mod tls;
 #[cfg(target_os = "windows")]
 mod tray;
 mod update;
+mod wad;
 mod window;
 
 use std::sync::atomic::Ordering;
@@ -58,6 +60,8 @@ fn main() {
             Some(vec![AUTOSTART_FLAG]),
         ))
         .manage(AppState::default())
+        // the league client's own rank and role images, for the page.
+        .register_asynchronous_uri_scheme_protocol(art::SCHEME, art::serve)
         .invoke_handler(tauri::generate_handler![
             commands::get_status,
             commands::get_auto_accept,

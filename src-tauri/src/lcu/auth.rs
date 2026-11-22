@@ -72,6 +72,16 @@ pub fn lockfile_watch_dir() -> Option<PathBuf> {
         .find(|dir| dir.is_dir())
 }
 
+// the folders league is installed in, as far as its lockfile locations tell,
+// for reading league's own files (see art.rs).
+pub fn league_folders() -> Vec<PathBuf> {
+    lcu_lockfiles()
+        .into_iter()
+        .filter_map(|path| path.parent().map(PathBuf::from))
+        .filter(|dir| dir.is_dir())
+        .collect()
+}
+
 // ---- league client (lcu) ----
 
 // where the league lockfile can live, most likely first.

@@ -2,6 +2,7 @@
 // background lcu supervisor task. all locks here are held only briefly and
 // never across an await, so the std sync primitives are enough.
 
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 
 use parking_lot::{Mutex, RwLock};
@@ -51,4 +52,8 @@ pub struct AppState {
     // the startup update check result. kept so the settings panel can read it
     // whenever it opens; the one-off event fires before the panel exists.
     pub update: RwLock<Option<UpdateInfo>>,
+    // the client's images the page has asked for (see art.rs), by their path
+    // in league's archive, kept for the app's run; none for one it lacks. the
+    // whole set is under 2 mb.
+    pub art: Mutex<HashMap<String, Option<Vec<u8>>>>,
 }
