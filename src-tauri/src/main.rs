@@ -233,6 +233,9 @@ fn reveal_main_window(app: &AppHandle, focus: bool) {
         if window.is_minimized().unwrap_or(false) {
             let _ = window.unminimize();
         }
+        // back to the normal memory target before it paints again.
+        #[cfg(target_os = "windows")]
+        window::set_memory_target(&window, false);
         let _ = window.show();
         // windows gives a window its taskbar button back every time it is
         // shown, so the skip has to be reapplied after each show.

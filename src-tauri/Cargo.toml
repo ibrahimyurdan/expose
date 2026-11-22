@@ -46,6 +46,9 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std"
 windows-version = "0.1"
 # square corners and a dark border for the frameless window on windows 11.
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+# the webview's memory target, low while the window hides in the tray. the
+# version tauri's webview uses, so the types match.
+webview2-com = "0.38"
 
 # small and fast release builds: one codegen unit with full lto, tuned for
 # size, without symbols. a panic aborts after the panic hook has logged it

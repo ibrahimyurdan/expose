@@ -203,6 +203,44 @@ pub fn hide_main(app: &AppHandle) {
     remember_window(app);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
+        #[cfg(target_os = "windows")]
+        set_memory_target(&window, true);
+    }
+}
+
+// windows: tells webview2 how much memory to hold on to. hidden in the tray,
+// expose asks for the low target, so the webview gives memory back; shown,
+// the normal one. best effort: a webview2 runtime too old for the call just
+// leaves a log line.
+#[cfg(target_os = "windows")]
+pub fn set_memory_target(window: &WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+    };
+    use windows::core::Interface;
+
+    let level = if low {
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+    } else {
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+    };
+    let reached = window.with_webview(move |webview| {
+        // safety: the controller is this window's live webview2 controller,
+        // and with_webview runs this on the thread that owns it.
+        let set = unsafe {
+            webview
+                .controller()
+                .CoreWebView2()
+                .and_then(|core| core.cast::<ICoreWebView2_19>())
+                .and_then(|core| core.SetMemoryUsageTargetLevel(level))
+        };
+        if let Err(error) = set {
+            log::warn!("could not set the webview's memory target: {error}");
+        }
+    });
+    if let Err(error) = reached {
+        log::warn!("could not reach the webview to set its memory target: {error}");
     }
 }
 

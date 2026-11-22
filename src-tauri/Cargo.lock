@@ -1060,6 +1060,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
+ "webview2-com",
  "windows 0.61.3",
  "windows-version",
 ]

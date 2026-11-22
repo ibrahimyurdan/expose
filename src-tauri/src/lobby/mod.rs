@@ -786,6 +786,8 @@ fn show_window(app: &AppHandle) {
 fn hide_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
+        #[cfg(target_os = "windows")]
+        crate::window::set_memory_target(&window, true);
     }
 }
 
