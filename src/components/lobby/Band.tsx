@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { MetalWork } from "@/components/art/MetalWork";
 import { useCountdown } from "@/hooks/useCountdown";
 import { lobbyReceivedAt } from "@/hooks/useLobby";
-import { barModes, formatBandClock, type BarMode } from "@/lib/band";
+import { armedFinal, barModes, formatBandClock, type BarMode } from "@/lib/band";
 import { phaseLabel, queueName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { LobbyView } from "@/types";
@@ -25,13 +25,12 @@ export function Band({
 }) {
   const left = useCountdown(lobby.timeLeftMs, lobbyReceivedAt(lobby));
   const total = lobby.totalMs > 0 ? lobby.totalMs : Math.max(lobby.timeLeftMs, 1);
-  const finalStage = lobby.stage === "finalization";
-  const armedFinal = lobby.dodge.armed && finalStage;
-  const modes = barModes(lobby.stage, lobby.acting, armedFinal);
+  const final = armedFinal(lobby);
+  const modes = barModes(lobby.stage, lobby.acting, final);
   const yourTurn = lobby.players.some((player) => player.isSelf && player.acting);
   const fill = Math.min(1, Math.max(0, left / total));
   // an armed dodge fires this far from the clock end of each bar.
-  const tick = armedFinal ? Math.min(1, lobby.dodge.leadMs / total) : null;
+  const tick = final ? Math.min(1, lobby.dodge.leadMs / total) : null;
 
   return (
     <div

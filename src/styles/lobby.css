@@ -421,17 +421,22 @@
     margin: 0 6px;
     color: var(--text-muted);
   }
-  .row-name svg {
-    display: inline-block;
+  /* the match marker sits 6px after the name, outside it: the name takes only
+     its own width and is the one cut short when the line runs out. */
+  .row-line--name {
+    gap: 6px;
+  }
+  .row-line--name > .row-name {
+    flex: 0 1 auto;
+  }
+  .row-line--name > span:not(.tag) {
+    display: inline-flex;
+    align-items: center;
+  }
+  .row-line--name svg {
     width: 10px;
     height: 8px;
-    margin-left: 6px;
-    vertical-align: 0;
     color: var(--blue-2);
-  }
-  .row-name .tag {
-    margin-left: 6px;
-    vertical-align: 1px;
   }
   .row.is-self .row-role,
   .row.is-self .row-champ,

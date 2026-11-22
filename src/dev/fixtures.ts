@@ -100,8 +100,8 @@ export function statusFor(screen: PreviewScreen): ConnectionStatus {
 // to slots. hidden: a ranked lobby without the riot client, so no names at all.
 // normal: a draft game where nothing is hidden. pick: ranked again, with your
 // jungler on the clock to pick. long: ranked with the longest names and
-// labels, to check rows at the smallest window. aram: an aram lobby, with no
-// positions and no turns.
+// labels, and the widest match marker, to check rows at the smallest window.
+// aram: an aram lobby, with no positions and no turns.
 export type LobbyVariant =
   | "ranked"
   | "guess"
@@ -513,7 +513,9 @@ function matchKind(player: FixturePlayer, variant: LobbyVariant): MatchKind {
     return "own";
   }
   switch (variant) {
+    // long: a guess, since "likely" is the widest match marker.
     case "guess":
+    case "long":
       return "guess";
     case "normal":
       return "visible";

@@ -8,6 +8,14 @@ import type { Acting, Stage } from "@/types";
 // turn, or an armed dodge's final seconds. hidden: that side is not acting.
 export type BarMode = "teal" | "red" | "hidden";
 
+// an armed dodge is in its final seconds (red bars, the tick, the live
+// countdown) only while the lobby locks in: FINALIZATION, the one phase the
+// backend fires in. GAME_STARTING shares the finalization stage, but it is
+// past the dodge, so it must not say "dodging now".
+export function armedFinal(lobby: { phase: string; dodge: { armed: boolean } }): boolean {
+  return lobby.dodge.armed && lobby.phase === "FINALIZATION";
+}
+
 // bare seconds for a phase under 100 s, as the client prints them; minutes
 // and seconds for a longer one. an unknown length goes by the time left.
 export function formatBandClock(leftMs: number, totalMs: number): string {

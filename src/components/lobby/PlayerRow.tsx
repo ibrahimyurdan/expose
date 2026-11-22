@@ -152,6 +152,7 @@ export function PlayerRow({
             <p className="row-name type-label">
               <Identity player={player} />
             </p>
+            <MatchMarker player={player} />
           </div>
 
           <FlagLine
@@ -194,12 +195,7 @@ function Identity({ player }: { player: PlayerView }) {
     );
   }
   if (!player.alias) {
-    return identity && identity.gameName ? (
-      <>
-        <RiotId identity={identity} />
-        <MatchBadge identity={identity} />
-      </>
-    ) : null;
+    return identity && identity.gameName ? <RiotId identity={identity} /> : null;
   }
   if (!identity) {
     return (
@@ -216,9 +212,19 @@ function Identity({ player }: { player: PlayerView }) {
       {player.alias}
       <span className="sep">·</span>
       <RiotId identity={identity} />
-      <MatchBadge identity={identity} />
     </>
   );
+}
+
+// how sure the match is, after the name and outside it: a long name is cut
+// short before its marker is. none on your own row, and none until a name
+// league shows has arrived.
+function MatchMarker({ player }: { player: PlayerView }) {
+  const { identity } = player;
+  if (player.isSelf || !identity || (!player.alias && !identity.gameName)) {
+    return null;
+  }
+  return <MatchBadge identity={identity} />;
 }
 
 function RiotId({ identity }: { identity: IdentityView }) {

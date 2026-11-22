@@ -61,8 +61,24 @@ pub fn launch_shows(os: &str, args: &[String]) -> bool {
     !(os == "windows" && args.iter().any(|arg| arg == AUTOSTART_FLAG))
 }
 
-fn should_first_show(already_shown: bool, launch_shows: bool) -> bool {
-    !already_shown && launch_shows
+// what a launch does once its first screen is ready.
+#[derive(Debug, PartialEq, Eq)]
+enum FirstShow {
+    // show the window.
+    Show,
+    // a login start on windows: stay in the tray, with the webview on its low
+    // memory target as if the window had been hidden.
+    StayHidden,
+    // the first show already happened.
+    Done,
+}
+
+fn first_show_action(already_shown: bool, launch_shows: bool) -> FirstShow {
+    match (already_shown, launch_shows) {
+        (true, _) => FirstShow::Done,
+        (false, true) => FirstShow::Show,
+        (false, false) => FirstShow::StayHidden,
+    }
 }
 
 // shows the window for this launch, once: when the ui says its first screen
@@ -72,9 +88,19 @@ pub fn first_show(app: &AppHandle, reason: &str) {
     let args: Vec<String> = std::env::args().collect();
     let shows = launch_shows(std::env::consts::OS, &args);
     let already = FIRST_SHOWN.swap(true, Ordering::SeqCst);
-    if should_first_show(already, shows) {
-        log::info!("window: first shown ({reason})");
-        show_main_window(app);
+    match first_show_action(already, shows) {
+        FirstShow::Show => {
+            log::info!("window: first shown ({reason})");
+            show_main_window(app);
+        }
+        FirstShow::StayHidden => {
+            log::info!("window: login start, staying in the tray");
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                set_memory_target(&window, true);
+            }
+        }
+        FirstShow::Done => {}
     }
 }
 
@@ -293,8 +319,15 @@ mod tests {
 
     #[test]
     fn first_show_happens_once() {
-        assert!(should_first_show(false, true));
-        assert!(!should_first_show(true, true));
-        assert!(!should_first_show(false, false));
+        assert_eq!(first_show_action(false, true), FirstShow::Show);
+        assert_eq!(first_show_action(true, true), FirstShow::Done);
+        assert_eq!(first_show_action(true, false), FirstShow::Done);
+    }
+
+    #[test]
+    fn a_login_start_stays_hidden_on_the_low_memory_target() {
+        // windows' --autostart launch: never shown, so never hidden either;
+        // the first show is where it gets the tray's low memory target.
+        assert_eq!(first_show_action(false, false), FirstShow::StayHidden);
     }
 }

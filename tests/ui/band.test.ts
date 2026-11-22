@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { barModes, formatBandClock } from "../../src/lib/band.ts";
+import { armedFinal, barModes, formatBandClock } from "../../src/lib/band.ts";
 
 test("short phases print bare seconds, rounded up", () => {
   assert.equal(formatBandClock(26000, 30000), "26");
@@ -44,4 +44,26 @@ test("picks show only the picking team's bar", () => {
 test("a ban or pick stage with nobody on the clock stays teal", () => {
   assert.deepEqual(barModes("ban", "none", false), { left: "teal", right: "teal" });
   assert.deepEqual(barModes("pick", "none", false), { left: "teal", right: "teal" });
+});
+
+test("an armed dodge counts down while the lobby locks in", () => {
+  assert.equal(
+    armedFinal({ phase: "FINALIZATION", stage: "finalization", dodge: { armed: true } }),
+    true,
+  );
+});
+
+test("game starting is past the dodge: no countdown and no red bars", () => {
+  // the backend fires only in FINALIZATION; GAME_STARTING shares its stage.
+  assert.equal(
+    armedFinal({ phase: "GAME_STARTING", stage: "finalization", dodge: { armed: true } }),
+    false,
+  );
+});
+
+test("an unarmed dodge has no final seconds", () => {
+  assert.equal(
+    armedFinal({ phase: "FINALIZATION", stage: "finalization", dodge: { armed: false } }),
+    false,
+  );
 });

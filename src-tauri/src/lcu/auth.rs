@@ -16,21 +16,42 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use super::Credentials;
 use crate::error::{Error, Result};
 
-// scan_processes allows the costly process scan; without it only lockfiles
-// are read (see scan_due).
+// scan_processes allows the costly process scan when league's lockfile is
+// missing; without it, league is found by its lockfile alone (see scan_due).
 pub fn find_credentials(scan_processes: bool) -> Option<Credentials> {
+    find_with(
+        scan_processes,
+        lcu_from_lockfile,
+        riot_from_lockfile,
+        league_process_args,
+    )
+}
+
+// find_credentials with its sources passed in, so tests can stand in for the
+// lockfiles and the process table.
+fn find_with(
+    scan_processes: bool,
+    lcu_lockfile: impl FnOnce() -> Option<(u16, String)>,
+    riot_lockfile: impl FnOnce() -> Option<(u16, String)>,
+    process_args: impl Fn() -> Option<Vec<String>>,
+) -> Option<Credentials> {
     // scanning processes is the expensive step, so it only runs when a lockfile
     // cannot answer, and at most once per attempt.
-    let process_args = OnceCell::new();
-    let args = || {
-        if !scan_processes {
-            return None;
-        }
-        process_args.get_or_init(league_process_args).as_deref()
-    };
+    let scanned = OnceCell::new();
+    let args = || scanned.get_or_init(&process_args).as_deref();
 
-    let (port, token) = lcu_from_lockfile().or_else(|| lcu_from_args(args()?))?;
-    let (riot_port, riot_token) = match riot_from_lockfile().or_else(|| riot_from_args(args()?)) {
+    // looking for league itself on the command line waits for a scan slot
+    // (scan_due). once league is found, the riot half may always fall back to
+    // it: that scan runs once per connect, and without it ranked names would
+    // stay hidden for the whole session.
+    let (port, token) = lcu_lockfile().or_else(|| {
+        if scan_processes {
+            lcu_from_args(args()?)
+        } else {
+            None
+        }
+    })?;
+    let (riot_port, riot_token) = match riot_lockfile().or_else(|| riot_from_args(args()?)) {
         Some((port, token)) => (Some(port), Some(token)),
         None => (None, None),
     };
@@ -223,6 +244,69 @@ pub fn arg_value<S: AsRef<str>>(args: &[S], prefix: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn command_line(flags: &[&str]) -> Option<Vec<String>> {
+        Some(flags.iter().map(|flag| (*flag).to_string()).collect())
+    }
+
+    #[test]
+    fn a_missing_riot_lockfile_falls_back_to_the_league_command_line() {
+        // league's lockfile answers, so league is running: the riot half may
+        // read its command line even when the 30 s scan slot is closed.
+        let found = find_with(
+            false,
+            || Some((50_000, "lcu".to_string())),
+            || None,
+            || {
+                command_line(&[
+                    "--riotclient-app-port=60000",
+                    "--riotclient-auth-token=riot",
+                ])
+            },
+        )
+        .expect("league is running");
+        assert_eq!(found.riot_port, Some(60_000));
+        assert_eq!(found.riot_token.as_deref(), Some("riot"));
+    }
+
+    #[test]
+    fn without_a_scan_slot_a_closed_league_leaves_the_process_table_alone() {
+        let scans = std::cell::Cell::new(0);
+        let found = find_with(
+            false,
+            || None,
+            || None,
+            || {
+                scans.set(scans.get() + 1);
+                command_line(&["--app-port=50000", "--remoting-auth-token=lcu"])
+            },
+        );
+        assert!(found.is_none());
+        assert_eq!(scans.get(), 0);
+    }
+
+    #[test]
+    fn the_process_table_is_scanned_at_most_once_per_attempt() {
+        let scans = std::cell::Cell::new(0);
+        let found = find_with(
+            true,
+            || None,
+            || None,
+            || {
+                scans.set(scans.get() + 1);
+                command_line(&[
+                    "--app-port=50000",
+                    "--remoting-auth-token=lcu",
+                    "--riotclient-app-port=60000",
+                    "--riotclient-auth-token=riot",
+                ])
+            },
+        )
+        .expect("league found on the command line");
+        assert_eq!(found.port, 50_000);
+        assert_eq!(found.riot_port, Some(60_000));
+        assert_eq!(scans.get(), 1);
+    }
 
     #[test]
     fn parses_a_well_formed_lockfile() {

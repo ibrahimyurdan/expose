@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { usePushNotice } from "@/hooks/notices";
 import { useCountdown } from "@/hooks/useCountdown";
 import { lobbyReceivedAt } from "@/hooks/useLobby";
+import { armedFinal } from "@/lib/band";
 import { bridge } from "@/lib/bridge";
 import { formatClock, formatPreciseClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -149,7 +150,7 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
             htmlFor={`${id}-switch`}
             className={cn(
               armed ? "dodge-armed" : "type-label",
-              armed && lobby.stage === "finalization" && "is-final",
+              armedFinal(lobby) && "is-final",
             )}
           >
             {armed ? <ArmedStatus lobby={lobby} /> : "Last second"}
@@ -168,7 +169,7 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
 // countdown to that moment, so the dodge never comes as a surprise.
 function ArmedStatus({ lobby }: { lobby: LobbyView }) {
   const lead = lobby.dodge.leadMs;
-  if (lobby.stage !== "finalization" && lobby.phase !== "FINALIZATION") {
+  if (!armedFinal(lobby)) {
     return <>Dodges at {formatPreciseClock(lead)}</>;
   }
   return <FinalCountdown lobby={lobby} />;
