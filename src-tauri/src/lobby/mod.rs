@@ -32,7 +32,7 @@ use identity::{
     format_uuid, guess, parse_uuid, resolve_exact, Candidate, Identity, MatchKind, Resolved,
     SlotHint,
 };
-use session::{is_blank, Session, SessionPlayer};
+use session::{is_blank, Acting, Session, SessionPlayer, Stage};
 use stats::{fetch_stats, Fetched, PlayerStats, Position, StatsCache};
 use view::{build_view, LobbyView, ScoutContext};
 
@@ -86,6 +86,8 @@ pub struct LobbyState {
     pub session_at: Option<Instant>,
     // the match counts last written to the log.
     pub logged_summary: String,
+    // the stage and acting team last written to the log.
+    pub logged_turn: Option<(Stage, Acting)>,
     // the scout site was opened for this lobby.
     pub auto_opened: bool,
     // the player heard that this lobby's names could not be read.
@@ -306,6 +308,7 @@ fn publish(app: &AppHandle) {
     );
     lobby.session = Some(session);
     log_matches(&mut lobby, view.unmatched.len());
+    log_turn(&mut lobby, view.stage, view.acting);
     *state.lobby_view.write() = Some(view.clone());
     if let Err(error) = app.emit(EVENT_LOBBY, &view) {
         log::warn!("could not emit the lobby: {error}");
@@ -657,6 +660,15 @@ fn log_matches(lobby: &mut LobbyState, unmatched: usize) {
     if line != lobby.logged_summary {
         log::info!("{line}");
         lobby.logged_summary = line;
+    }
+}
+
+// writes the champ select stage and which team is on a turn whenever they
+// change, so a real lobby shows that the turns are read right.
+fn log_turn(lobby: &mut LobbyState, stage: Stage, acting: Acting) {
+    if lobby.logged_turn != Some((stage, acting)) {
+        log::info!("lobby: stage={} acting={}", stage.as_str(), acting.as_str());
+        lobby.logged_turn = Some((stage, acting));
     }
 }
 

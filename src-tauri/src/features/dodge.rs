@@ -270,6 +270,7 @@ mod tests {
             timer: SessionTimer {
                 phase: phase.to_string(),
                 adjusted_time_left_in_phase: time_left_ms,
+                ..SessionTimer::default()
             },
             ..Session::default()
         }

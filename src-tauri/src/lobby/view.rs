@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use super::flags::{flags_for, summarize, Flag, FlagInput, Summary, KDA_GAMES, WIN_RATE_GAMES};
 use super::identity::{Confidence, Identity, MatchKind};
-use super::session::Session;
+use super::session::{Acting, Session, Stage};
 use super::stats::{GameSummary, PlayerStats, Position};
 use super::{canonical_puuid, LobbyState};
 use crate::scout;
@@ -27,6 +27,11 @@ pub struct LobbyView {
     pub phase: String,
     // time left in the phase when the client sent the session.
     pub time_left_ms: i64,
+    // the phase's full length, for the clock and its bars; 0 when unknown.
+    pub total_ms: i64,
+    // where champ select stands and which team is on a turn.
+    pub stage: Stage,
+    pub acting: Acting,
     // riot hides at least one teammate's name.
     pub anonymous: bool,
     // your team in slot order, you included.
@@ -64,6 +69,8 @@ pub struct PlayerView {
     pub flags: Vec<Flag>,
     // their profile on the chosen scout site.
     pub scout_url: Option<String>,
+    // banning or picking right now.
+    pub acting: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -229,6 +236,7 @@ pub fn build_view(
             stats_pending,
             flags,
             scout_url,
+            acting: session.is_cell_acting(player.cell_id),
         });
     }
 
@@ -242,6 +250,9 @@ pub fn build_view(
         queue_id: session.queue_id,
         phase: session.timer.phase.clone(),
         time_left_ms: session.timer.adjusted_time_left_in_phase,
+        total_ms: session.timer.total_time_in_phase,
+        stage: session.stage(),
+        acting: session.acting(),
         anonymous: session.is_anonymous(),
         players,
         unmatched: unmatched(state),
@@ -910,6 +921,32 @@ mod tests {
     }
 
     #[test]
+    fn view_carries_the_turn() {
+        let mut value: Value = serde_json::from_str(RANKED).expect("the fixture should parse");
+        value["actions"] = json!([[{
+            "actorCellId": 1,
+            "completed": false,
+            "isAllyAction": true,
+            "isInProgress": true,
+            "type": "pick",
+        }]]);
+        let session: Session = serde_json::from_value(value).expect("the session should parse");
+        let mut state = LobbyState::default();
+        let view = build(&session, &mut state);
+
+        assert_eq!(view.stage, Stage::Pick);
+        assert_eq!(view.acting, Acting::Ally);
+        assert_eq!(view.total_ms, 30_000);
+        let acting: Vec<i64> = view
+            .players
+            .iter()
+            .filter(|player| player.acting)
+            .map(|player| player.cell_id)
+            .collect();
+        assert_eq!(acting, [1]);
+    }
+
+    #[test]
     fn serializes_like_the_frontend_expects() {
         let teammate = PlayerView {
             key: SUPPORT.to_string(),
@@ -963,6 +1000,7 @@ mod tests {
                 label: "lost last 4".to_string(),
             }],
             scout_url: Some("https://www.op.gg/summoners/na/Sample%20Teammate-NA1".to_string()),
+            acting: true,
         };
         let me = PlayerView {
             key: YOU.to_string(),
@@ -979,6 +1017,7 @@ mod tests {
             stats_pending: true,
             flags: Vec::new(),
             scout_url: None,
+            acting: false,
         };
         let view = LobbyView {
             game_id: 5_123_456_789,
@@ -1001,30 +1040,40 @@ mod tests {
                 armed: true,
                 lead_ms: 1500,
             },
+            stage: Stage::Ban,
+            acting: Acting::Both,
+            total_ms: 30_000,
         };
         let json = serde_json::to_value(&view).unwrap();
 
         assert_eq!(
             keys(&json),
             [
+                "acting",
                 "anonymous",
                 "dodge",
                 "gameId",
                 "phase",
                 "players",
                 "queueId",
+                "stage",
                 "summary",
                 "timeLeftMs",
+                "totalMs",
                 "unmatched",
             ]
         );
         assert_eq!(json["gameId"], json!(5_123_456_789_i64));
         assert_eq!(json["timeLeftMs"], json!(9_000));
+        assert_eq!(json["stage"], "ban");
+        assert_eq!(json["acting"], "both");
+        assert_eq!(json["totalMs"], json!(30_000));
 
         let teammate = &json["players"][0];
         assert_eq!(
             keys(teammate),
             [
+                "acting",
                 "alias",
                 "cellId",
                 "championId",
@@ -1044,6 +1093,8 @@ mod tests {
         assert_eq!(teammate["position"], "utility");
         assert_eq!(teammate["spells"], json!([4, 3]));
         assert_eq!(teammate["isAutofilled"], true);
+        assert_eq!(teammate["acting"], true);
+        assert_eq!(json["players"][1]["acting"], false);
 
         let identity = &teammate["identity"];
         assert_eq!(

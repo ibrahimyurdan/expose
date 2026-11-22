@@ -6,7 +6,7 @@
 // out of range takes its default as well (see lenient), so one odd value
 // never blanks the lobby.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::lenient::lenient;
 
@@ -26,6 +26,10 @@ pub struct Session {
     pub timer: SessionTimer,
     #[serde(deserialize_with = "lenient")]
     pub chat_details: ChatDetails,
+    // the bans and picks of champ select in order, each group taken
+    // together (simultaneous bans share one group).
+    #[serde(deserialize_with = "lenient")]
+    pub actions: Vec<Vec<SessionAction>>,
     // theirTeam arrives with identities scrubbed by riot, so it is not read.
 }
 
@@ -75,6 +79,76 @@ pub struct SessionTimer {
     // milliseconds remaining in the current phase.
     #[serde(deserialize_with = "lenient")]
     pub adjusted_time_left_in_phase: i64,
+    // the phase's full length in milliseconds.
+    #[serde(deserialize_with = "lenient")]
+    pub total_time_in_phase: i64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SessionAction {
+    #[serde(deserialize_with = "lenient")]
+    pub actor_cell_id: i64,
+    // your team's action, not the enemy's.
+    #[serde(deserialize_with = "lenient")]
+    pub is_ally_action: bool,
+    // on the clock right now.
+    #[serde(deserialize_with = "lenient")]
+    pub is_in_progress: bool,
+    // "ban", "pick", or a step that is no turn, such as "ten_bans_reveal".
+    #[serde(rename = "type", deserialize_with = "lenient")]
+    pub kind: String,
+}
+
+// where champ select stands. unknown when the session does not say, for
+// example a pick and ban phase with no action in progress.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Stage {
+    #[default]
+    Unknown,
+    Planning,
+    Ban,
+    Pick,
+    Finalization,
+}
+
+// which team is on a ban or pick turn right now.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Acting {
+    #[default]
+    None,
+    Ally,
+    Enemy,
+    Both,
+}
+
+impl Stage {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Stage::Unknown => "unknown",
+            Stage::Planning => "planning",
+            Stage::Ban => "ban",
+            Stage::Pick => "pick",
+            Stage::Finalization => "finalization",
+        }
+    }
+
+    fn has_turns(self) -> bool {
+        matches!(self, Stage::Ban | Stage::Pick)
+    }
+}
+
+impl Acting {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Acting::None => "none",
+            Acting::Ally => "ally",
+            Acting::Enemy => "enemy",
+            Acting::Both => "both",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -104,6 +178,54 @@ impl Session {
         self.my_team
             .iter()
             .find(|player| player.cell_id == self.local_player_cell_id)
+    }
+
+    // the stage from the timer, and in pick and ban from the turns on the
+    // clock: bans before picks.
+    pub fn stage(&self) -> Stage {
+        match self.timer.phase.as_str() {
+            "PLANNING" => Stage::Planning,
+            "FINALIZATION" | "GAME_STARTING" => Stage::Finalization,
+            "BAN_PICK" => {
+                if self.turns().any(|action| action.kind == "ban") {
+                    Stage::Ban
+                } else if self.turns().any(|action| action.kind == "pick") {
+                    Stage::Pick
+                } else {
+                    Stage::Unknown
+                }
+            }
+            _ => Stage::Unknown,
+        }
+    }
+
+    pub fn acting(&self) -> Acting {
+        if !self.stage().has_turns() {
+            return Acting::None;
+        }
+        let ally = self.turns().any(|action| action.is_ally_action);
+        let enemy = self.turns().any(|action| !action.is_ally_action);
+        match (ally, enemy) {
+            (true, true) => Acting::Both,
+            (true, false) => Acting::Ally,
+            (false, true) => Acting::Enemy,
+            (false, false) => Acting::None,
+        }
+    }
+
+    // a teammate in this cell is banning or picking right now.
+    pub fn is_cell_acting(&self, cell_id: i64) -> bool {
+        self.stage().has_turns()
+            && self
+                .turns()
+                .any(|action| action.is_ally_action && action.actor_cell_id == cell_id)
+    }
+
+    // the bans and picks on the clock right now.
+    fn turns(&self) -> impl Iterator<Item = &SessionAction> {
+        self.actions.iter().flatten().filter(|action| {
+            action.is_in_progress && (action.kind == "ban" || action.kind == "pick")
+        })
     }
 }
 
@@ -217,6 +339,141 @@ mod tests {
             .filter(|player| player.is_autofilled)
             .count();
         assert_eq!(autofilled, 1);
+    }
+
+    // the ranked fixture in another phase, with these actions.
+    fn session(phase: &str, actions: serde_json::Value) -> Session {
+        let mut value: serde_json::Value =
+            serde_json::from_str(RANKED).expect("the fixture should parse");
+        value["timer"]["phase"] = serde_json::json!(phase);
+        value["actions"] = actions;
+        serde_json::from_value(value).expect("the session should parse")
+    }
+
+    fn action(cell: i64, kind: &str, ally: bool, in_progress: bool) -> serde_json::Value {
+        serde_json::json!({
+            "actorCellId": cell,
+            "championId": 0,
+            "completed": !in_progress,
+            "id": cell + 1,
+            "isAllyAction": ally,
+            "isInProgress": in_progress,
+            "pickTurn": 1,
+            "type": kind,
+        })
+    }
+
+    fn acting_cells(session: &Session) -> Vec<i64> {
+        (0..10)
+            .filter(|&cell| session.is_cell_acting(cell))
+            .collect()
+    }
+
+    #[test]
+    fn reads_the_phase_length_and_actions() {
+        let session = ranked();
+        assert_eq!(session.timer.total_time_in_phase, 30_000);
+        assert_eq!(session.actions.len(), 2);
+        assert_eq!(session.actions[0][1].actor_cell_id, 1);
+        assert_eq!(session.actions[1][0].kind, "pick");
+        assert!(session.actions[0][0].is_ally_action);
+        // every action in the fixture is done, so nobody is on a turn.
+        assert_eq!(session.stage(), Stage::Unknown);
+        assert_eq!(session.acting(), Acting::None);
+    }
+
+    #[test]
+    fn planning_has_no_turn() {
+        let session = session("PLANNING", serde_json::json!([]));
+        assert_eq!(session.stage(), Stage::Planning);
+        assert_eq!(session.acting(), Acting::None);
+        assert!(acting_cells(&session).is_empty());
+    }
+
+    #[test]
+    fn simultaneous_bans_are_both_teams() {
+        let session = session(
+            "BAN_PICK",
+            serde_json::json!([[
+                action(0, "ban", true, true),
+                action(1, "ban", true, true),
+                action(5, "ban", false, true),
+            ]]),
+        );
+        assert_eq!(session.stage(), Stage::Ban);
+        assert_eq!(session.acting(), Acting::Both);
+        assert_eq!(acting_cells(&session), [0, 1]);
+    }
+
+    #[test]
+    fn your_teams_pick() {
+        let session = session(
+            "BAN_PICK",
+            serde_json::json!([
+                [action(0, "ban", true, false)],
+                [action(2, "pick", true, true)],
+            ]),
+        );
+        assert_eq!(session.stage(), Stage::Pick);
+        assert_eq!(session.acting(), Acting::Ally);
+        assert_eq!(acting_cells(&session), [2]);
+    }
+
+    #[test]
+    fn enemy_pick() {
+        let session = session(
+            "BAN_PICK",
+            serde_json::json!([[action(7, "pick", false, true)]]),
+        );
+        assert_eq!(session.stage(), Stage::Pick);
+        assert_eq!(session.acting(), Acting::Enemy);
+        assert!(acting_cells(&session).is_empty());
+    }
+
+    #[test]
+    fn blind_pick_is_your_teams_pick() {
+        let picks: Vec<serde_json::Value> = (0..5)
+            .map(|cell| action(cell, "pick", true, true))
+            .collect();
+        let session = session("BAN_PICK", serde_json::json!([picks]));
+        assert_eq!(session.stage(), Stage::Pick);
+        assert_eq!(session.acting(), Acting::Ally);
+        assert_eq!(acting_cells(&session), [0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn finalization_has_no_turn() {
+        for phase in ["FINALIZATION", "GAME_STARTING"] {
+            let session = session(phase, serde_json::json!([[action(0, "pick", true, false)]]));
+            assert_eq!(session.stage(), Stage::Finalization);
+            assert_eq!(session.acting(), Acting::None);
+            assert!(acting_cells(&session).is_empty());
+        }
+    }
+
+    #[test]
+    fn ignores_actions_that_are_not_turns() {
+        let session = session(
+            "BAN_PICK",
+            serde_json::json!([[action(0, "ten_bans_reveal", true, true)]]),
+        );
+        assert_eq!(session.stage(), Stage::Unknown);
+        assert_eq!(session.acting(), Acting::None);
+        assert!(acting_cells(&session).is_empty());
+    }
+
+    #[test]
+    fn odd_actions_do_not_break_the_session() {
+        for actions in [
+            serde_json::json!(null),
+            serde_json::json!("x"),
+            serde_json::json!([[{"type": 5}]]),
+        ] {
+            let session = session("BAN_PICK", actions);
+            assert_eq!(session.game_id, 5_123_456_789);
+            assert_eq!(session.stage(), Stage::Unknown);
+            assert_eq!(session.acting(), Acting::None);
+        }
     }
 
     #[test]
