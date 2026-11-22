@@ -99,7 +99,7 @@ async fn subscribe(stream: &mut WsStream) -> Result<()> {
 }
 
 fn tls_config() -> Result<Arc<rustls::ClientConfig>> {
-    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = rustls::ClientConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .map_err(|error| Error::Tls(error.to_string()))?

@@ -11,6 +11,7 @@ mod lobby;
 mod models;
 mod scout;
 mod state;
+mod tls;
 #[cfg(target_os = "windows")]
 mod tray;
 mod update;
@@ -36,6 +37,8 @@ const AUTOSTART_FLAG: &str = "--autostart";
 const WINDOW_STATE: StateFlags = StateFlags::SIZE.union(StateFlags::POSITION);
 
 fn main() {
+    tls::install_crypto();
+    log_panics();
     let app = tauri::Builder::default()
         // single instance must be registered first: a second launch is
         // intercepted here and simply focuses the already running window.
@@ -149,19 +152,9 @@ fn main() {
                 }
             }
 
-            // macos: a frosted-glass window, a dock icon, and open on launch.
+            // macos: an opaque window, a dock icon, and open on launch.
             #[cfg(target_os = "macos")]
-            {
-                if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window_vibrancy::apply_vibrancy(
-                        &window,
-                        window_vibrancy::NSVisualEffectMaterial::HudWindow,
-                        None,
-                        None,
-                    );
-                }
-                show_main_window(&handle);
-            }
+            show_main_window(&handle);
 
             // background work: champion data, an update check, the supervisor.
             tauri::async_runtime::spawn(ddragon::load(handle.clone()));
@@ -207,6 +200,17 @@ fn start_logging(app: &AppHandle) {
         }
         Err(error) => eprintln!("expose: logging is off, could not open the log file: {error}"),
     }
+}
+
+// a release build aborts on a panic, so the panic is written to the log
+// first; otherwise a crash in a background task would leave no trace.
+fn log_panics() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("panic: {info}");
+        log::logger().flush();
+        previous(info);
+    }));
 }
 
 fn show_main_window(app: &AppHandle) {

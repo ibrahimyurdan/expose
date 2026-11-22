@@ -52,11 +52,6 @@ jobs:
           # the macos universal build needs both apple targets.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      # aws-lc-rs (pulled in by rustls) assembles with nasm on windows.
-      - name: install nasm
-        if: matrix.platform == 'windows-latest'
-        uses: ilammy/setup-nasm@v1
-
       - name: cache cargo build
         uses: swatinem/rust-cache@v2
         with:

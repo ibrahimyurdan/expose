@@ -20,11 +20,11 @@ futures-util = "0.3.32"
 log = "0.4"
 notify = "8.2.0"
 parking_lot = "0.12"
-reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls", "gzip"] }
-rustls = "0.23.40"
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls-no-provider", "gzip"] }
+rustls = { version = "0.23.40", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-sysinfo = "0.38.4"
+sysinfo = { version = "0.38.4", default-features = false, features = ["system"] }
 tauri = { version = "2.11.2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-log = "2.9.2"
@@ -33,7 +33,16 @@ tauri-plugin-single-instance = "2.4.2"
 tauri-plugin-store = "2.4.3"
 tauri-plugin-window-state = "2"
 thiserror = "2.0.18"
-tokio = { version = "1.47", features = ["full"] }
-tokio-rustls = "0.26.4"
+tokio = { version = "1.47", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "logging", "tls12"] }
 tokio-tungstenite = "0.29.0"
-window-vibrancy = "0.7.1"
+
+# small and fast release builds: one codegen unit with full lto, tuned for
+# size, without symbols. a panic aborts after the panic hook has logged it
+# (see log_panics in main.rs).
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+strip = true
+panic = "abort"

@@ -19,7 +19,7 @@ jobs:
 
   backend:
     # compile and test on both shipped platforms so a windows-only break (the
-    # tray module, autostart, aws-lc-rs) is caught here rather than at release.
+    # tray module, autostart, the window chrome) is caught here rather than at release.
     strategy:
       fail-fast: false
       matrix:
@@ -30,10 +30,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      # aws-lc-rs (pulled in by rustls) assembles with nasm on windows.
-      - name: install nasm
-        if: matrix.os == 'windows-latest'
-        uses: ilammy/setup-nasm@v1
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
@@ -53,9 +49,6 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      # aws-lc-rs (pulled in by rustls) assembles with nasm on windows.
-      - name: install nasm
-        uses: ilammy/setup-nasm@v1
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
