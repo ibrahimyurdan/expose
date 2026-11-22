@@ -167,6 +167,9 @@ export function createPreviewBackend(): Bridge {
     openLogsFolder: () => note("open the logs folder"),
     // there is no window to show in a browser.
     ready: () => done(),
+    hideWindow: () => note("hide the window"),
+    minimizeWindow: () => note("minimize the window"),
+    startResize: () => note("resize from the corner"),
 
     onStatus: (handler) => subscribe(statusHandlers, handler),
     onLobby: (handler) => subscribe(lobbyHandlers, handler),

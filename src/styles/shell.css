@@ -1,0 +1,84 @@
+/*
+  the window's own chrome, the same on both platforms: a 41px strip with a
+  2px gold line across the top, expose's mark and name, the connection
+  status, and minimize, settings and close at the right. on windows the
+  frameless window also gets a corner grip (and, on windows 10, the 1px edge
+  from base.css).
+*/
+@layer components {
+  .titlebar {
+    position: relative;
+    z-index: 30;
+    height: 41px;
+    flex: none;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* 15px: the mark's drawing starts half a pixel into its box, so it lands
+       on the 16px content edge the band, cards and rows use. */
+    padding: 0 5px 0 15px;
+    background: var(--bg);
+    border-top: 2px solid var(--line-gold);
+    border-bottom: 1px solid var(--line-header);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .brand > svg {
+    flex: none;
+  }
+  .titlebar .status {
+    margin-left: auto;
+    margin-right: 12px;
+  }
+  .window-buttons {
+    display: flex;
+    flex: none;
+    gap: 5px;
+  }
+  /* the update dot sits at the gear's top right, cut out of it by a 2px ring
+     of the background, and lights up with the glyph. */
+  .icon-btn .glyph {
+    position: relative;
+    width: 18px;
+    height: 18px;
+  }
+  .update-dot {
+    position: absolute;
+    top: -2px;
+    right: -3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold-4);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+  .icon-btn:hover .update-dot,
+  .icon-btn:focus-visible .update-dot,
+  .icon-btn[aria-pressed="true"] .update-dot {
+    background: var(--gold-1);
+  }
+
+  .grip {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    z-index: 40;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    cursor: nwse-resize;
+  }
+  .grip svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+}

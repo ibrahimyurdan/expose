@@ -5,6 +5,7 @@
 @import "./styles/base.css";
 @import "./styles/type.css";
 @import "./styles/controls.css";
+@import "./styles/shell.css";
 
 /* mac: and win: apply in the shell of that platform (main.tsx sets
    data-platform from lib/platform.ts, in the app and in the preview). */

@@ -8,6 +8,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+import { platform } from "@/lib/platform";
 
 import type {
   ChampionData,
@@ -48,6 +51,13 @@ export interface Bridge {
   openLogsFolder: () => Promise<void>;
   // the first screen has painted: the backend shows the window for a launch.
   ready: () => Promise<void>;
+  // the title bar's buttons. close hides (expose keeps running) and saves the
+  // window's place; minimize goes to the dock on macos and hides on windows,
+  // where the window has no taskbar button.
+  hideWindow: () => Promise<void>;
+  minimizeWindow: () => Promise<void>;
+  // the windows corner grip.
+  startResize: () => Promise<void>;
 
   onStatus: (handler: (status: ConnectionStatus) => void) => Promise<UnlistenFn>;
   // null when champ select ends.
@@ -79,6 +89,10 @@ const tauriBridge: Bridge = {
   setWelcomed: () => invoke<void>("set_welcomed"),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   ready: () => invoke<void>("frontend_ready"),
+  hideWindow: () => invoke<void>("hide_main_window"),
+  minimizeWindow: () =>
+    platform === "macos" ? getCurrentWindow().minimize() : invoke<void>("hide_main_window"),
+  startResize: () => getCurrentWindow().startResizeDragging("SouthEast"),
 
   onStatus: (handler) => listen<ConnectionStatus>(EVENT_STATUS, (event) => handler(event.payload)),
   onLobby: (handler) => listen<LobbyView | null>(EVENT_LOBBY, (event) => handler(event.payload)),
@@ -147,6 +161,9 @@ function previewBridge(): Bridge {
     setWelcomed: forward("setWelcomed"),
     openLogsFolder: forward("openLogsFolder"),
     ready: forward("ready"),
+    hideWindow: forward("hideWindow"),
+    minimizeWindow: forward("minimizeWindow"),
+    startResize: forward("startResize"),
     onStatus: forward("onStatus"),
     onLobby: forward("onLobby"),
     onUpdate: forward("onUpdate"),

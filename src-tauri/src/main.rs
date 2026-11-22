@@ -89,6 +89,13 @@ fn main() {
                     window::hide_main(window.app_handle());
                 }
             }
+            // appkit may bring the traffic lights back; hide them again.
+            #[cfg(target_os = "macos")]
+            if matches!(event, WindowEvent::Resized(_) | WindowEvent::Focused(true))
+                && window.label() == "main"
+            {
+                window::hide_traffic_lights(window.clone());
+            }
         })
         .setup(|app| {
             let handle = app.handle().clone();

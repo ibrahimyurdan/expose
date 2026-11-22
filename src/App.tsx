@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Header } from "@/components/shell/Header";
+import { TitleBar } from "@/components/shell/TitleBar";
+import { WindowEdge } from "@/components/shell/WindowEdge";
 import { Notices } from "@/components/shell/Notices";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NoticeProvider } from "@/hooks/notices";
@@ -11,6 +12,8 @@ import { useSettings } from "@/hooks/useSettings";
 import { useStatus } from "@/hooks/useStatus";
 import { useUpdate } from "@/hooks/useUpdate";
 import { bridge, previewScreen } from "@/lib/bridge";
+import { platform } from "@/lib/platform";
+import { cn } from "@/lib/utils";
 import { Idle } from "@/screens/Idle";
 import { Lobby } from "@/screens/Lobby";
 import { Settings } from "@/screens/Settings";
@@ -81,6 +84,40 @@ function Shell() {
     settingsOpen,
   });
 
+  const minimal = screen === "welcome" || screen === "loading";
+
+  // ⌘, on macos and ctrl+, on windows open and close settings, as in most
+  // apps. not on the welcome screen, which has no settings button either.
+  useEffect(() => {
+    if (minimal) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const modifier = platform === "macos" ? event.metaKey : event.ctrlKey;
+      if (modifier && event.key === ",") {
+        event.preventDefault();
+        setSettingsOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [minimal]);
+
+  // the first screen is there when the window appears, so only the screens
+  // after it fade in.
+  const firstShown = useRef<Screen | null>(null);
+  const [fadeScreens, setFadeScreens] = useState(false);
+  useEffect(() => {
+    if (screen === "loading") {
+      return;
+    }
+    if (firstShown.current === null) {
+      firstShown.current = screen;
+    } else if (screen !== firstShown.current) {
+      setFadeScreens(true);
+    }
+  }, [screen]);
+
   // each screen starts at the top: champ select closing a scrolled settings
   // page must not open the lobby halfway down.
   useEffect(() => {
@@ -142,22 +179,29 @@ function Shell() {
 
   return (
     <div className="relative flex h-full flex-col">
-      <Header
+      <TitleBar
         status={status}
         update={update}
         settingsOpen={settingsOpen}
         onToggleSettings={() => setSettingsOpen((open) => !open)}
-        minimal={screen === "welcome" || screen === "loading"}
+        minimal={minimal}
       />
       {/* relative: the screen-reader-only text inside is positioned absolutely;
           main has to contain it, or it stretches the document past the window
           and scrolling a row into view slides the header away. */}
       <main ref={main} className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div key={screen} className="flex min-h-full animate-in flex-col duration-200 fade-in-0">
+        <div
+          key={screen}
+          className={cn(
+            "flex min-h-full flex-col",
+            fadeScreens && "animate-in duration-200 fade-in-0",
+          )}
+        >
           {content}
         </div>
       </main>
       <Notices />
+      {platform === "windows" ? <WindowEdge /> : null}
     </div>
   );
 }

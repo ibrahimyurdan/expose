@@ -99,11 +99,103 @@ pub fn build_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
         .accept_first_mouse(true);
-    // windows: the window has no taskbar button, so a minimized window would
-    // have nowhere to go.
+    // windows: no system frame; the title bar is expose's own. windows 11
+    // keeps its shadow (with square corners, set below); windows 10 has no
+    // shadow, and the ui draws the edge. the window has no taskbar button, so
+    // a minimized window would have nowhere to go.
     #[cfg(target_os = "windows")]
-    let builder = builder.minimizable(false);
-    builder.build()
+    let builder = builder
+        .decorations(false)
+        .shadow(frame == Frame::Os)
+        .minimizable(false);
+    let window = builder.build()?;
+    #[cfg(target_os = "windows")]
+    if frame == Frame::Os {
+        square_corners(&window);
+    }
+    // macos: the title bar's own buttons give way to expose's.
+    #[cfg(target_os = "macos")]
+    hide_traffic_lights(window.as_ref().window());
+    Ok(window)
+}
+
+// hides the red, yellow and green buttons; expose's title bar draws league
+// style ones instead. appkit can bring them back when the window resizes or
+// comes forward, so this runs again then (see main.rs). never set a traffic
+// light position: tao moves the buttons on every redraw when one is set.
+#[cfg(target_os = "macos")]
+pub fn hide_traffic_lights(window: tauri::Window) {
+    let target = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Ok(handle) = target.ns_window() else {
+            return;
+        };
+        // safety: tauri hands out this window's live NSWindow, and appkit is
+        // used here on the main thread only.
+        let ns_window = unsafe { &*handle.cast::<objc2_app_kit::NSWindow>() };
+        let mut shown = 0;
+        for kind in [
+            objc2_app_kit::NSWindowButton::CloseButton,
+            objc2_app_kit::NSWindowButton::MiniaturizeButton,
+            objc2_app_kit::NSWindowButton::ZoomButton,
+        ] {
+            if let Some(button) = ns_window.standardWindowButton(kind) {
+                button.setHidden(true);
+                if !button.isHidden() {
+                    shown += 1;
+                }
+            }
+        }
+        // said once, so a bug report shows whether the hiding held.
+        if !LIGHTS_LOGGED.swap(true, Ordering::Relaxed) {
+            if shown == 0 {
+                log::info!("window: traffic lights hidden");
+            } else {
+                log::warn!("window: {shown} traffic light button(s) stayed visible");
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+static LIGHTS_LOGGED: AtomicBool = AtomicBool::new(false);
+
+// windows 11 rounds a frameless window's corners and draws a light border;
+// the league look keeps them square, with an edge in the window's dark blue.
+#[cfg(target_os = "windows")]
+fn square_corners(window: &WebviewWindow) {
+    use windows::Win32::Foundation::COLORREF;
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE,
+        DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let corners = DWMWCP_DONOTROUND;
+    // #1e282d, written as 0x00bbggrr.
+    let border = COLORREF(0x002D_281E);
+    // safety: both values live across the calls, and each size matches its
+    // value's type.
+    unsafe {
+        if let Err(error) = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            std::ptr::from_ref(&corners).cast(),
+            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+        ) {
+            log::warn!("could not square the window corners: {error}");
+        }
+        if let Err(error) = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            std::ptr::from_ref(&border).cast(),
+            std::mem::size_of::<COLORREF>() as u32,
+        ) {
+            log::warn!("could not color the window border: {error}");
+        }
+    }
 }
 
 // hides the window and saves its size and position.
