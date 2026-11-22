@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 import type { GameView } from "@/types";
 
-// recent results as a row of dots, newest on the left: green for a win, red
-// for a loss. screen readers get the count instead of ten separate dots.
+// recent results as a row of dots, newest on the left: teal for a win, dark
+// red for a loss (the bright red stays for flags). screen readers get the
+// count instead of ten separate dots.
 export function FormDots({
   games,
   limit = 10,
@@ -20,12 +21,9 @@ export function FormDots({
       <span className="sr-only">
         Last {shown.length} games: {wins} won, {shown.length - wins} lost.
       </span>
-      <span aria-hidden className="inline-flex items-center gap-0.5">
+      <span aria-hidden className="dots">
         {shown.map((game, index) => (
-          <span
-            key={`${game.startedAtMs}-${index}`}
-            className={cn("size-1.5 rounded-full", game.win ? "bg-green" : "bg-red")}
-          />
+          <i key={`${game.startedAtMs}-${index}`} className={game.win ? "win" : "loss"} />
         ))}
       </span>
     </span>

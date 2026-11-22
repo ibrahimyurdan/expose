@@ -31,6 +31,7 @@ export const DDRAGON_VERSION = "16.23.1";
 // [numeric key, data dragon image id, display name], for every champion the
 // fixtures mention.
 const CHAMPION_ROWS: [number, string, string][] = [
+  [20, "Nunu", "Nunu & Willump"],
   [24, "Jax", "Jax"],
   [51, "Caitlyn", "Caitlyn"],
   [58, "Renekton", "Renekton"],
@@ -98,8 +99,18 @@ export function statusFor(screen: PreviewScreen): ConnectionStatus {
 // resolving: the first moments of a ranked lobby, names known but not yet tied
 // to slots. hidden: a ranked lobby without the riot client, so no names at all.
 // normal: a draft game where nothing is hidden. pick: ranked again, with your
-// jungler on the clock to pick.
-export type LobbyVariant = "ranked" | "guess" | "resolving" | "hidden" | "normal" | "pick";
+// jungler on the clock to pick. long: ranked with the longest names and
+// labels, to check rows at the smallest window. aram: an aram lobby, with no
+// positions and no turns.
+export type LobbyVariant =
+  | "ranked"
+  | "guess"
+  | "resolving"
+  | "hidden"
+  | "normal"
+  | "pick"
+  | "long"
+  | "aram";
 
 export const LOBBY_VARIANTS: readonly LobbyVariant[] = [
   "ranked",
@@ -108,6 +119,8 @@ export const LOBBY_VARIANTS: readonly LobbyVariant[] = [
   "hidden",
   "normal",
   "pick",
+  "long",
+  "aram",
 ];
 
 export interface LobbyOptions {
@@ -398,6 +411,8 @@ const DEFAULT_PENDING: Record<LobbyVariant, readonly string[]> = {
   hidden: [],
   normal: [],
   pick: [],
+  long: [],
+  aram: [],
 };
 
 interface Timer {
@@ -462,7 +477,36 @@ const TIMERS: Record<LobbyVariant, Timer> = {
     acting: "ally",
     actingCells: [1],
   },
+  long: {
+    phase: "BAN_PICK",
+    timeLeftMs: 19_000,
+    totalMs: 30_000,
+    stage: "pick",
+    acting: "ally",
+    actingCells: [1],
+  },
+  aram: {
+    phase: "BAN_PICK",
+    timeLeftMs: 41_000,
+    totalMs: 60_000,
+    stage: "unknown",
+    acting: "none",
+    actingCells: [],
+  },
 };
+
+// the long lobby's jungler: a 16-character name with a 5-character tag,
+// grandmaster, three red flags, on nunu & willump.
+const LONG_JUNGLER = {
+  name: { gameName: "Wwwwwwwwwwwwwwww", tagLine: "WWWWW" },
+  championId: 20,
+  rank: { tier: "GRANDMASTER", division: "I", lp: 1234, wins: 212, losses: 187 },
+  flags: [
+    { kind: "autofilled", severity: "red", label: "autofilled, mains mid" },
+    { kind: "lossStreak", severity: "red", label: "lost last 4" },
+    { kind: "firstTime", severity: "red", label: "first time on nunu & willump" },
+  ],
+} as const;
 
 function matchKind(player: FixturePlayer, variant: LobbyVariant): MatchKind {
   if (player.isSelf) {
@@ -482,10 +526,20 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
   const now = options.now ?? Date.now();
   const provider = options.provider ?? "opgg";
   const pending = options.pending ?? DEFAULT_PENDING[variant];
-  const anonymous = variant !== "normal";
+  const anonymous = variant !== "normal" && variant !== "aram";
   const { actingCells, ...timer } = TIMERS[variant];
 
-  const players = TEAM.map((player): PlayerView => {
+  const players = TEAM.map((base): PlayerView => {
+    const player: FixturePlayer =
+      variant === "long" && base.cellId === 1
+        ? {
+            ...base,
+            name: { ...LONG_JUNGLER.name },
+            championId: LONG_JUNGLER.championId,
+            rank: { ...LONG_JUNGLER.rank },
+            flags: LONG_JUNGLER.flags.map((flag) => ({ ...flag })),
+          }
+        : base;
     const resolved = player.isSelf || (variant !== "resolving" && variant !== "hidden");
     const kind = matchKind(player, variant);
     const loading = resolved && pending.includes(player.key);
@@ -495,8 +549,9 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
       cellId: player.cellId,
       isSelf: player.isSelf,
       alias: anonymous && !player.isSelf ? player.alias : null,
-      position: player.position,
-      isAutofilled: player.isAutofilled,
+      // aram has no positions.
+      position: variant === "aram" ? null : player.position,
+      isAutofilled: variant !== "aram" && player.isAutofilled,
       // while declaring, the support has not hovered a champion yet.
       championId: variant === "resolving" && player.cellId === 4 ? 0 : player.championId,
       spells: player.spells,
@@ -508,7 +563,11 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
       matching: !resolved && variant === "resolving",
       stats,
       statsPending: loading,
-      flags: stats && !player.isSelf ? player.flags : [],
+      // an aram slot has no role, so nobody is autofilled.
+      flags:
+        stats && !player.isSelf
+          ? player.flags.filter((flag) => variant !== "aram" || flag.kind !== "autofilled")
+          : [],
       scoutUrl: resolved ? profileUrl(provider, player.name) : null,
       acting: actingCells.includes(player.cellId),
     };
@@ -525,7 +584,7 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
 
   return {
     gameId: variant === "normal" ? 5_210_351_266 : 5_210_337_904,
-    queueId: variant === "normal" ? 400 : 420,
+    queueId: variant === "normal" ? 400 : variant === "aram" ? 450 : 420,
     ...timer,
     anonymous,
     players,

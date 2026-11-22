@@ -65,8 +65,8 @@ function ChampSelect({
         />
       </Band>
 
-      <div className="flex flex-col gap-4 px-4 pt-1 pb-4">
-        <ul aria-label="Your team" className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4 px-4 pb-4">
+        <ul aria-label="Your team" className="team">
           {lobby.players.map((player, index) => (
             <PlayerRow
               key={player.key}

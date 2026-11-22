@@ -136,6 +136,9 @@
     margin-top: 12px;
     padding: 14px 16px;
     display: grid;
+    /* one column as wide as the card: a long title is cut short instead of
+       widening the column past the frame. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
   .summary-head {
@@ -298,5 +301,470 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* the team, one row per player, and a player's details. */
+@layer components {
+  .team {
+    display: flex;
+    flex-direction: column;
+  }
+  /* an opened entry scrolls up to just under the pinned band (212 to 216px
+     tall) and the fade that hangs under it. */
+  .team > li {
+    scroll-margin-top: 230px;
+  }
+  /* rows are split by a strip: a small hollow diamond and a fading line. */
+  .team > li::before {
+    content: "";
+    display: block;
+    height: 9px;
+    background:
+      url("../assets/art/row-diamond.svg") no-repeat left center / 9px 9px,
+      linear-gradient(
+          90deg,
+          rgba(84, 64, 34, 0.9) 0,
+          rgba(84, 64, 34, 0.76) 26%,
+          rgba(84, 64, 34, 0.49) 45%,
+          rgba(84, 64, 34, 0.2) 65%,
+          rgba(84, 64, 34, 0) 78%
+        )
+        no-repeat 8px center / calc(100% - 8px) 1px;
+  }
+  .row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 78px;
+    padding: 8px 8px 8px 12px;
+    box-sizing: border-box;
+  }
+  .row[data-expandable] {
+    cursor: pointer;
+  }
+  .row:hover,
+  .row[data-open] {
+    background: var(--row-glow);
+  }
+  /* a teammate banning or picking right now: a bar at the left edge. */
+  .row[data-acting]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--ally);
+  }
+  .row.is-self[data-acting]::before {
+    background: var(--self);
+  }
+  .row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-shadow: var(--shadow-text-art);
+  }
+  /* every line keeps its height, so nothing moves when stats arrive. */
+  .row-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .row-line > :first-child {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-line > :not(:first-child) {
+    flex: none;
+  }
+  .row-line--role {
+    height: 14px;
+  }
+  .row-line--champ {
+    height: 20px;
+  }
+  .row-line--name {
+    height: 16px;
+  }
+  .row-line--flags {
+    height: 22px;
+  }
+  .row-champ .games {
+    margin-left: 6px;
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    text-transform: none;
+    color: var(--gold-2);
+  }
+  .row-name .match {
+    color: var(--gold-1);
+    letter-spacing: inherit;
+  }
+  .row-name .tagline {
+    color: var(--text-secondary);
+  }
+  /* "name hidden" and "matching name". (not .hidden: tailwind's hidden
+     utility would hide it.) */
+  .row-name .unnamed {
+    font-style: italic;
+  }
+  .row-name .sep {
+    margin: 0 6px;
+    color: var(--text-muted);
+  }
+  .row-name svg {
+    display: inline-block;
+    width: 10px;
+    height: 8px;
+    margin-left: 6px;
+    vertical-align: 0;
+    color: var(--blue-2);
+  }
+  .row-name .tag {
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .row.is-self .row-role,
+  .row.is-self .row-champ,
+  .row.is-self .row-name,
+  .row.is-self .row-name .match {
+    color: var(--self);
+  }
+  /* one line of chips: those that fit, then a "+n" chip for the rest. a
+     first chip too long for the line is cut short. */
+  .row-line > .row-flags {
+    display: flex;
+    gap: 4px;
+    height: 22px;
+  }
+  .row-flags > li {
+    display: flex;
+    min-width: 0;
+  }
+  .row-flags > .row-more {
+    flex: none;
+    cursor: default;
+  }
+  /* the chips at their full widths, out of sight, to fit the line by. */
+  .row-flags-ruler {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    display: flex;
+    gap: 4px;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .row-flags-ruler > li {
+    flex: none;
+  }
+  .row-fine {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+  }
+  .row-fine > svg {
+    width: 12px;
+    height: 12px;
+    color: var(--green);
+  }
+  .row-quiet {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+  }
+  /* the details toggle: a small triangle, pointing right when closed and
+     down when open. */
+  .row-toggle {
+    width: 24px;
+    height: 22px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+  .row-toggle > i {
+    width: 0;
+    height: 0;
+    border: 4px solid transparent;
+    border-top-color: currentColor;
+    transform: translateY(2px) rotate(-90deg);
+    transform-origin: 50% 25%;
+    transition: transform 0.2s cubic-bezier(0, 0, 0, 1);
+  }
+  .row-toggle[aria-expanded="true"] > i {
+    transform: translateY(2px) rotate(0deg);
+  }
+  .row-toggle:hover,
+  .row-toggle:focus-visible {
+    color: var(--gold-1);
+  }
+  .row-toggle:active {
+    color: var(--gold-2);
+  }
+
+  /* a champion portrait in a gold ring. */
+  .portrait {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex: none;
+  }
+  .portrait-face {
+    position: absolute;
+    inset: 2px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--surface-well);
+  }
+  .portrait-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.2);
+  }
+  .portrait-empty {
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--surface-well);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7);
+    color: var(--gold-3);
+  }
+  .portrait-empty svg {
+    width: 55%;
+    height: 55%;
+  }
+  /* (not .ring: tailwind's ring utility would draw a square outline.) */
+  .portrait > .portrait-ring {
+    position: absolute;
+    inset: 0;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+  }
+  /* the small square icon in the recent games list. */
+  .champ-square {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid var(--gold-6);
+    background: var(--surface-well);
+  }
+  .champ-square img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.1);
+  }
+
+  /* rank, results and kda. */
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .rank > svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .rank-tier {
+    font: 400 11px/13px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--gold-2);
+  }
+  .rank-lp,
+  .rank-none {
+    font: 400 11px/13px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--text-secondary);
+  }
+  .dots {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .dots > i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .dots > .win {
+    background: var(--win);
+  }
+  .dots > .loss {
+    background: var(--red-strong);
+  }
+  .kda {
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--gold-1);
+    white-space: nowrap;
+  }
+  .kda .high {
+    color: var(--kda-high);
+  }
+  .kda .low {
+    color: var(--kda-low);
+  }
+  .kda .label {
+    margin-left: 4px;
+    color: var(--text-stat);
+  }
+
+  /* a player's details: the raised card under the row, with a caret that
+     points up at the portrait. */
+  .details {
+    position: relative;
+    margin: 4px 0 10px 12px;
+    padding: 14px 16px;
+  }
+  .details-caret {
+    position: absolute;
+    top: -11px;
+    left: 11px;
+    width: 22px;
+    height: 11px;
+  }
+  .details-section + .details-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid transparent;
+    border-image: var(--divider) 1;
+  }
+  .details-label {
+    margin-bottom: 6px;
+  }
+  .facts {
+    display: flex;
+  }
+  /* a label too long for its column wraps to a second line; the values stay
+     on one line along the bottom. */
+  .facts > div {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  /* the level is a few digits, so its column takes only what it needs and
+     leaves the room to the longer labels. */
+  .facts > div:first-child {
+    flex: none;
+    padding-left: 0;
+  }
+  .facts > .rule--v {
+    flex: none;
+    padding: 0;
+  }
+  .facts dt {
+    margin-bottom: 2px;
+  }
+  .facts dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .roles {
+    display: flex;
+    align-items: flex-end;
+    width: 180px;
+    max-width: 100%;
+    gap: 4px;
+  }
+  .role {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .role-track {
+    width: 100%;
+    height: 36px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .role-bar {
+    width: 7px;
+    min-height: 1px;
+    height: calc(var(--share) * 100%);
+    border-radius: 3.5px 3.5px 0 0;
+    background: var(--gold-5);
+    opacity: 0.55;
+  }
+  .role.is-slot .role-bar {
+    background: var(--gold-2);
+    opacity: 1;
+  }
+  .role > svg {
+    width: 14px;
+    height: 14px;
+    margin-top: 5px;
+    color: var(--gold-3);
+    opacity: 0.5;
+  }
+  .role.is-slot > svg {
+    opacity: 1;
+  }
+  .role-pct {
+    margin-top: 2px;
+  }
+  .games-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+  }
+  .game {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 24px;
+  }
+  .game .w,
+  .game .l {
+    width: 10px;
+    flex: none;
+    font-weight: 700;
+  }
+  .game .w {
+    color: var(--win);
+  }
+  .game .l {
+    color: var(--red-strong);
+  }
+  .game .kda-line {
+    color: var(--gold-1);
+    white-space: nowrap;
+  }
+  .game .ago {
+    margin-left: auto;
+    color: var(--text-secondary);
+    white-space: nowrap;
   }
 }

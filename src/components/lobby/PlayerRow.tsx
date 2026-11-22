@@ -1,18 +1,20 @@
-import { BadgeCheck, ChevronDown, CircleCheck } from "lucide-react";
 import { useEffect, useId, useRef, type CSSProperties } from "react";
 
-import { ChampionIcon, championName } from "@/components/lobby/ChampionIcon";
+import { ExactGlyph, FineGlyph } from "@/components/art/glyphs";
+import { ChampionIcon, championName, type RingTone } from "@/components/lobby/ChampionIcon";
 import { FormDots } from "@/components/lobby/FormDots";
 import { PlayerDetail } from "@/components/lobby/PlayerDetail";
 import { RankBadge } from "@/components/lobby/RankBadge";
 import { Chip, Tag, type ChipTone, type TagTone } from "@/components/ui/chip";
-import { IconButton } from "@/components/ui/icon-button";
+import { Loader } from "@/components/ui/loader";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useFit } from "@/hooks/useFit";
 import { flagText, formatKda, plural, positionLabel, riotId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
   ChampionData,
   Confidence,
+  Flag,
   IdentityView,
   MatchKind,
   PlayerView,
@@ -40,14 +42,20 @@ const MATCH_HINTS: Record<Exclude<MatchKind, "own" | "guess">, string> = {
   elimination: "Exact match, the only name left",
 };
 
-// one teammate (or you), in three lines next to the champion portrait:
-//   1. the slot's name (the alias when ranked hides names), the champion and
-//      the solo/duo rank;
-//   2. who is behind an alias (exact, or a "likely" guess), recent form and kda;
-//   3. red flags, or a quiet "looks fine".
-// stats fill in as they arrive, with a shimmer until then. a row with stats
-// opens to show more; the whole row toggles it, and the chevron button is the
-// keyboard and screen reader control.
+// the kda shown green from this and up, red under the low mark (a little
+// above the 1.5 that raises a bad kda flag, so a weak kda shows before it is
+// a flag).
+const KDA_HIGH = 3;
+const KDA_LOW = 2;
+
+// one teammate (or you), in four lines next to the champion portrait:
+//   1. the slot's role, and the solo/duo rank;
+//   2. the champion and the games on it, and the last ten results and kda;
+//   3. the alias and who is behind it (exact, or a "likely" guess);
+//   4. red flags, or a quiet "looks fine", and the details toggle.
+// every line keeps its height, so the row does not move as stats arrive. a
+// row with stats opens to show more; the whole row toggles it, and the
+// triangle button is the keyboard and screen reader control.
 export function PlayerRow({
   player,
   champions,
@@ -64,171 +72,171 @@ export function PlayerRow({
   style?: CSSProperties;
 }) {
   const detailId = useId();
-  const card = useRef<HTMLElement>(null);
+  const entry = useRef<HTMLLIElement>(null);
   const { identity, stats } = player;
   // the backend says when a hidden teammate is still being matched, rather
   // than hidden for good.
-  const loading = player.statsPending || player.matching;
+  const matching = player.matching;
+  // the summoner and rank can be in while the history is still on the way.
+  const historyPending = player.statsPending || matching;
   const expandable = stats !== null;
   const open = expanded && stats !== null;
 
-  // a row opened near the bottom would unfold out of sight, so bring it into
-  // view (its scroll margin keeps it clear of the pinned band above).
+  // the details are taller than the room under the pinned band, so an opened
+  // row moves up to just under the band, with as much of its details as fits
+  // below it (the entry's scroll margin keeps it clear of the band).
   useEffect(() => {
     if (!open) {
       return;
     }
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    card.current?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+    entry.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
   }, [open]);
 
   // what the client shows for the slot: the alias in ranked, else the name.
   // a match can come before its name does, so an empty name falls through.
   const title = player.alias || identity?.gameName || (player.isSelf ? "You" : "Teammate");
-  // a name league shows (normal games, your party): the whole riot id, since
-  // line two has no room to repeat it.
-  const shown = !player.alias && identity && identity.gameName ? identity : null;
   const champion = championName(champions, player.championId);
   const picked = player.championId > 0;
+  const ring: RingTone = player.isSelf ? "self" : player.acting ? "acting" : "teammate";
 
   return (
     <li
+      ref={entry}
       style={style}
-      className="animate-in duration-300 fill-mode-backwards fade-in-0 slide-in-from-bottom-1"
+      className="animate-in duration-300 fill-mode-backwards fade-in-0"
     >
       <article
-        ref={card}
         aria-label={title}
-        className={cn(
-          // the pinned band is about 160px tall.
-          "scroll-mt-42 scroll-mb-4 rounded-card border bg-surface transition-colors",
-          open ? "border-border-strong" : "border-border",
-          expandable && !open && "hover:border-border-strong",
-        )}
+        className={cn("row", player.isSelf && "is-self")}
+        data-open={open || undefined}
+        data-acting={player.acting || undefined}
+        data-expandable={expandable || undefined}
+        // the triangle is the real control; the row is a bigger target for
+        // the mouse.
+        onClick={expandable ? onToggle : undefined}
       >
-        {/* the chevron below is the real control; the row is a bigger target
-            for the mouse. */}
-        <div className="flex gap-3 p-3" onClick={expandable ? onToggle : undefined}>
-          <div className="flex w-10 shrink-0 flex-col items-center gap-1">
-            <ChampionIcon championId={player.championId} champions={champions} />
-            <span className="-mx-1 h-4 text-xs whitespace-nowrap text-fg-secondary">
+        <ChampionIcon
+          championId={player.championId}
+          champions={champions}
+          size="portrait"
+          ring={ring}
+          position={player.position}
+        />
+
+        <div className="row-text">
+          <div className="row-line row-line--role">
+            <span className="row-role type-role">
               {player.position ? positionLabel(player.position) : null}
             </span>
+            {stats ? (
+              <RankBadge rank={stats.rank} unranked={stats.unranked} />
+            ) : historyPending ? (
+              <span aria-hidden className="skeleton h-3 w-20" />
+            ) : null}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex h-5 items-center gap-3">
-              <p className="flex min-w-0 flex-1 items-baseline gap-2">
-                {shown ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="max-w-[65%] shrink-0 truncate text-base font-semibold text-fg">
-                        {shown.gameName}
-                        {shown.tagLine ? (
-                          <span className="font-normal text-fg-secondary">#{shown.tagLine}</span>
-                        ) : null}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{riotId(shown)}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <span className="max-w-[65%] shrink-0 truncate text-base font-semibold text-fg">
-                    {title}
-                  </span>
-                )}
-                <span className="min-w-0 truncate text-base text-fg-secondary">
-                  {/* the champion table may still be loading, or not know a
-                      brand new champion yet. */}
-                  {champion ?? (picked ? "Unknown champion" : "No pick yet")}
-                  {picked && stats && stats.championGames !== null ? (
-                    <span className="text-sm"> · {plural(stats.championGames, "game")}</span>
-                  ) : null}
-                </span>
-              </p>
-              {loading ? (
-                <span aria-hidden className="skeleton h-3 w-20 shrink-0" />
-              ) : stats ? (
-                <RankBadge rank={stats.rank} unranked={stats.unranked} className="shrink-0" />
+          <div className="row-line row-line--champ">
+            <p className="row-champ type-h5">
+              {/* the champion table may still be loading, or not know a brand
+                  new champion yet. */}
+              {champion ?? (picked ? "Unknown champion" : "No pick yet")}
+              {picked && stats && stats.championGames !== null ? (
+                <span className="games">· {plural(stats.championGames, "game")}</span>
               ) : null}
-            </div>
-
-            <div className="flex h-4 items-center gap-3">
-              <div className="flex min-w-0 flex-1 items-center">
-                <Identity player={player} loading={loading} />
-              </div>
-              <Form stats={stats} loading={loading} />
-            </div>
-
-            <FlagLine
-              player={player}
-              loading={loading}
-              expandable={expandable}
-              expanded={open}
-              detailId={detailId}
-              onToggle={onToggle}
-              title={title}
-            />
+            </p>
+            <Form stats={stats} pending={historyPending} />
           </div>
-        </div>
 
-        {open ? (
-          <PlayerDetail
-            id={detailId}
+          <div className="row-line row-line--name">
+            <p className="row-name type-label">
+              <Identity player={player} />
+            </p>
+          </div>
+
+          <FlagLine
             player={player}
-            stats={stats}
-            champions={champions}
-            scoutLabel={scoutLabel}
+            pending={historyPending}
+            expandable={expandable}
+            expanded={open}
+            detailId={detailId}
+            onToggle={onToggle}
+            title={title}
           />
-        ) : null}
+        </div>
       </article>
+
+      {open ? (
+        <PlayerDetail
+          id={detailId}
+          player={player}
+          stats={stats}
+          champions={champions}
+          scoutLabel={scoutLabel}
+        />
+      ) : null}
     </li>
   );
 }
 
-// line two, left: who the row is. "You" on your own row; behind an alias, the
-// matched riot id with how sure the match is; on a visible name (normal games,
-// where line one already shows it), the account level.
-function Identity({ player, loading }: { player: PlayerView; loading: boolean }) {
+// line three: who the row is. your own riot id on your row; behind an alias,
+// the alias and the matched riot id with how sure the match is; a name league
+// shows (normal games, your party) on its own.
+function Identity({ player }: { player: PlayerView }) {
   const { identity } = player;
 
   if (player.isSelf) {
     return (
-      <Tag tone="gold">You</Tag>
+      <>
+        {identity && identity.gameName ? <RiotId identity={identity} /> : "You"}
+        <span className="sr-only"> (you)</span>
+      </>
     );
   }
   if (!player.alias) {
-    if (loading) {
-      return <span aria-hidden className="skeleton h-3 w-14" />;
-    }
-    return player.stats?.level != null ? (
-      <span className="text-sm text-fg-secondary tabular-nums">Level {player.stats.level}</span>
+    return identity && identity.gameName ? (
+      <>
+        <RiotId identity={identity} />
+        <MatchBadge identity={identity} />
+      </>
     ) : null;
   }
   if (!identity) {
     return (
-      <span className="truncate text-sm text-fg-secondary">
-        {player.matching ? "Matching name…" : "Name hidden"}
-      </span>
+      <>
+        {player.alias}
+        <span className="sep">·</span>
+        <span className="unnamed">{player.matching ? "Matching name…" : "Name hidden"}</span>
+        {player.matching ? <Loader /> : null}
+      </>
     );
   }
   return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="min-w-0 truncate text-sm text-fg">
-            {identity.gameName}
-            {identity.tagLine ? <span className="text-fg-secondary">#{identity.tagLine}</span> : null}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{riotId(identity)}</TooltipContent>
-      </Tooltip>
+    <>
+      {player.alias}
+      <span className="sep">·</span>
+      <RiotId identity={identity} />
       <MatchBadge identity={identity} />
-    </span>
+    </>
   );
 }
 
-// a guess wears a "likely" chip toned by confidence; an exact match a small
-// check. both explain themselves on hover.
+function RiotId({ identity }: { identity: IdentityView }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="match">
+          {identity.gameName}
+          {identity.tagLine ? <span className="tagline">#{identity.tagLine}</span> : null}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{riotId(identity)}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// a guess wears a "likely" tag toned by confidence; an exact match a small
+// teal check. both explain themselves on hover.
 function MatchBadge({ identity }: { identity: IdentityView }) {
   if (identity.kind === "own") {
     return null;
@@ -251,8 +259,8 @@ function MatchBadge({ identity }: { identity: IdentityView }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex shrink-0 text-accent">
-          <BadgeCheck className="size-3.5" aria-hidden />
+        <span>
+          <ExactGlyph />
           <span className="sr-only">{hint}</span>
         </span>
       </TooltipTrigger>
@@ -261,14 +269,13 @@ function MatchBadge({ identity }: { identity: IdentityView }) {
   );
 }
 
-// line two, right: the last ten results and the kda over recent games, in
-// fixed widths so they line up from row to row.
-function Form({ stats, loading }: { stats: StatsView | null; loading: boolean }) {
-  if (loading) {
+// line two, right: the last ten results and the kda over recent games.
+function Form({ stats, pending }: { stats: StatsView | null; pending: boolean }) {
+  if (pending && !stats?.historyLoaded) {
     return (
-      <span aria-hidden className="flex shrink-0 items-center gap-2">
-        <span className="skeleton h-2 w-19" />
-        <span className="skeleton h-3 w-13" />
+      <span aria-hidden className="flex items-center gap-2">
+        <span className="skeleton h-1.5 w-19" />
+        <span className="skeleton h-3 w-12" />
       </span>
     );
   }
@@ -276,28 +283,34 @@ function Form({ stats, loading }: { stats: StatsView | null; loading: boolean })
     return null;
   }
   if (!stats.historyLoaded) {
-    return <span className="shrink-0 text-sm text-fg-secondary">No match history</span>;
+    return <span className="type-body">No match history</span>;
   }
   if (stats.recent.length === 0) {
-    return <span className="shrink-0 text-sm text-fg-secondary">No recent games</span>;
+    return <span className="type-body">No recent games</span>;
   }
   return (
-    <span className="flex shrink-0 items-center gap-2">
+    <span className="flex items-center gap-2">
       <FormDots games={stats.recent} />
-      <span className="w-13 text-right text-sm whitespace-nowrap tabular-nums">
-        <span className="text-fg">{stats.kda !== null ? formatKda(stats.kda) : "–"}</span>
-        <span className="text-fg-secondary"> KDA</span>
+      <span className="kda">
+        {stats.kda !== null ? (
+          <span className={stats.kda >= KDA_HIGH ? "high" : stats.kda < KDA_LOW ? "low" : undefined}>
+            {formatKda(stats.kda)}
+          </span>
+        ) : (
+          "–"
+        )}
+        <span className="label">KDA</span>
       </span>
     </span>
   );
 }
 
-// line three: the flag chips (they wrap), "looks fine", or for your own row the
-// account level and season, since you are never flagged. the details toggle
-// sits at its end.
+// line four: the flag chips, "looks fine", or for your own row the account
+// level and season, since you are never flagged. the details toggle sits at
+// its end.
 function FlagLine({
   player,
-  loading,
+  pending,
   expandable,
   expanded,
   detailId,
@@ -305,7 +318,7 @@ function FlagLine({
   title,
 }: {
   player: PlayerView;
-  loading: boolean;
+  pending: boolean;
   expandable: boolean;
   expanded: boolean;
   detailId: string;
@@ -315,45 +328,34 @@ function FlagLine({
   const { stats, flags } = player;
 
   let content;
-  if (loading) {
-    content = <span aria-hidden className="skeleton h-5 w-28 rounded-full!" />;
+  if (pending && !player.isSelf) {
+    content = (
+      <span aria-hidden className="skeleton h-5.5 w-28 flex-none" style={{ borderRadius: 16 }} />
+    );
   } else if (!stats) {
     // nothing known about this player (their name stayed hidden).
-    return null;
+    content = <span />;
   } else if (player.isSelf) {
-    content = <span className="truncate text-sm text-fg-secondary">{selfSummary(stats)}</span>;
+    content = <span className="row-quiet type-body">{selfSummary(stats)}</span>;
   } else if (flags.length === 0) {
     content = (
-      <span className="flex items-center gap-1.5 text-sm text-fg-secondary">
-        <CircleCheck className="size-3.5 shrink-0 text-green" aria-hidden />
+      <span className="row-fine type-body">
+        <FineGlyph aria-hidden />
         Looks fine
       </span>
     );
   } else {
-    content = (
-      <ul aria-label="Flags" className="flex min-w-0 flex-wrap gap-1">
-        {flags.map((flag) => (
-          <li key={flag.kind} className="flex min-w-0">
-            <Chip
-              tone={FLAG_TONES[flag.severity]}
-              warn={flag.severity !== "info"}
-              title={flagText(flag.label)}
-            >
-              {flagText(flag.label)}
-            </Chip>
-          </li>
-        ))}
-      </ul>
-    );
+    content = <Flags flags={flags} />;
   }
 
   return (
-    <div className="flex min-h-5 items-start gap-2">
-      <div className="flex min-h-5 min-w-0 flex-1 items-center">{content}</div>
+    <div className="row-line row-line--flags">
+      {content}
       {expandable ? (
-        <IconButton
-          label={expanded ? `Hide details for ${title}` : `Show details for ${title}`}
-          size="sm"
+        <button
+          type="button"
+          className="row-toggle"
+          aria-label={expanded ? `Hide details for ${title}` : `Show details for ${title}`}
           aria-expanded={expanded}
           aria-controls={expanded ? detailId : undefined}
           onClick={(event) => {
@@ -361,19 +363,73 @@ function FlagLine({
             event.stopPropagation();
             onToggle();
           }}
-          className="-my-0.5 -mr-1"
         >
-          <ChevronDown
-            aria-hidden
-            className={cn("transition-transform duration-200", expanded && "rotate-180")}
-          />
-        </IconButton>
+          <i aria-hidden />
+        </button>
       ) : null}
     </div>
   );
 }
 
-// your own third line: level and ranked season.
+// the flag chips, strongest first, on one line that keeps its height: the
+// chips that fit, then a "+N" chip that names the rest on hover. screen
+// readers hear every flag.
+function Flags({ flags }: { flags: Flag[] }) {
+  const list = useRef<HTMLUListElement>(null);
+  const ruler = useRef<HTMLUListElement>(null);
+  const shown = useFit(list, ruler, flags.map((flag) => flag.kind).join()) ?? flags.length;
+  const rest = flags.slice(shown);
+
+  return (
+    <>
+      <ul ref={list} aria-label="Flags" className="row-flags">
+        {flags.map((flag, index) => (
+          <li key={flag.kind} className={index < shown ? undefined : "sr-only"}>
+            <FlagChip flag={flag} />
+          </li>
+        ))}
+        {rest.length > 0 ? (
+          <li aria-hidden className="row-more">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Chip tone="neutral">+{rest.length}</Chip>
+              </TooltipTrigger>
+              <TooltipContent>
+                {rest.map((flag) => (
+                  <span key={flag.kind} className="block">
+                    {flagText(flag.label)}
+                  </span>
+                ))}
+              </TooltipContent>
+            </Tooltip>
+          </li>
+        ) : null}
+      </ul>
+      {/* every chip at its full width, and the widest "+N", to fit by. */}
+      <ul ref={ruler} aria-hidden className="row-flags-ruler">
+        {flags.map((flag) => (
+          <li key={flag.kind}>
+            <FlagChip flag={flag} />
+          </li>
+        ))}
+        <li>
+          <Chip tone="neutral">+{Math.max(flags.length - 1, 1)}</Chip>
+        </li>
+      </ul>
+    </>
+  );
+}
+
+function FlagChip({ flag }: { flag: Flag }) {
+  const text = flagText(flag.label);
+  return (
+    <Chip tone={FLAG_TONES[flag.severity]} warn={flag.severity !== "info"} title={text}>
+      {text}
+    </Chip>
+  );
+}
+
+// your own fourth line: level and ranked season.
 function selfSummary(stats: StatsView): string {
   const parts: string[] = [];
   if (stats.level !== null) {
