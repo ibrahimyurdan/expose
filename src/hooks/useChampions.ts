@@ -3,34 +3,35 @@ import { useEffect, useState } from "react";
 import { bridge } from "@/lib/bridge";
 import type { ChampionData } from "@/types";
 
-// loads the data dragon champion table. the backend fetches it asynchronously
-// on startup, so this polls until it is available, then stops.
+// the data dragon champion table. the backend loads it in the background, so
+// this asks once for what is there and then listens for each load (startup,
+// or a new patch when league connects).
 export function useChampions(): ChampionData | null {
   const [champions, setChampions] = useState<ChampionData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function load(): Promise<void> {
-      while (!cancelled) {
-        try {
-          const data = await bridge.getChampions();
-          if (data) {
-            if (!cancelled) {
-              setChampions(data);
-            }
-            return;
-          }
-        } catch {
-          // ignore and retry below
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+    const unlisten = bridge.onChampions((data) => {
+      if (!cancelled) {
+        setChampions(data);
       }
-    }
-
-    void load();
+    });
+    // asked only once the listener is in place, so a load that lands in
+    // between is never missed.
+    unlisten
+      .then(() => bridge.getChampions())
+      .then((data) => {
+        // a load that arrived through the event first wins.
+        if (!cancelled && data) {
+          setChampions((current) => current ?? data);
+        }
+      })
+      .catch(() => {
+        // the event brings the table once the backend has it.
+      });
     return () => {
       cancelled = true;
+      void unlisten.then((stop) => stop());
     };
   }, []);
 

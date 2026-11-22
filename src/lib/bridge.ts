@@ -23,6 +23,7 @@ const EVENT_STATUS = "expose://status";
 const EVENT_LOBBY = "expose://lobby";
 const EVENT_UPDATE = "expose://update";
 const EVENT_NOTICE = "expose://notice";
+const EVENT_CHAMPIONS = "expose://champions";
 
 export interface Bridge {
   getStatus: () => Promise<ConnectionStatus>;
@@ -51,6 +52,8 @@ export interface Bridge {
   onLobby: (handler: (lobby: LobbyView | null) => void) => Promise<UnlistenFn>;
   onUpdate: (handler: (info: UpdateInfo) => void) => Promise<UnlistenFn>;
   onNotice: (handler: (notice: Notice) => void) => Promise<UnlistenFn>;
+  // the champion table, whenever the backend loads it (startup, a new patch).
+  onChampions: (handler: (champions: ChampionData) => void) => Promise<UnlistenFn>;
 }
 
 const tauriBridge: Bridge = {
@@ -78,6 +81,8 @@ const tauriBridge: Bridge = {
   onLobby: (handler) => listen<LobbyView | null>(EVENT_LOBBY, (event) => handler(event.payload)),
   onUpdate: (handler) => listen<UpdateInfo>(EVENT_UPDATE, (event) => handler(event.payload)),
   onNotice: (handler) => listen<Notice>(EVENT_NOTICE, (event) => handler(event.payload)),
+  onChampions: (handler) =>
+    listen<ChampionData>(EVENT_CHAMPIONS, (event) => handler(event.payload)),
 };
 
 // true when the ui runs in a plain browser instead of the app.
@@ -134,6 +139,7 @@ function previewBridge(): Bridge {
     onLobby: forward("onLobby"),
     onUpdate: forward("onUpdate"),
     onNotice: forward("onNotice"),
+    onChampions: forward("onChampions"),
   };
 }
 

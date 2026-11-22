@@ -16,11 +16,18 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use super::Credentials;
 use crate::error::{Error, Result};
 
-pub fn find_credentials() -> Option<Credentials> {
+// scan_processes allows the costly process scan; without it only lockfiles
+// are read (see scan_due).
+pub fn find_credentials(scan_processes: bool) -> Option<Credentials> {
     // scanning processes is the expensive step, so it only runs when a lockfile
     // cannot answer, and at most once per attempt.
     let process_args = OnceCell::new();
-    let args = || process_args.get_or_init(league_process_args).as_deref();
+    let args = || {
+        if !scan_processes {
+            return None;
+        }
+        process_args.get_or_init(league_process_args).as_deref()
+    };
 
     let (port, token) = lcu_from_lockfile().or_else(|| lcu_from_args(args()?))?;
     let (riot_port, riot_token) = match riot_from_lockfile().or_else(|| riot_from_args(args()?)) {

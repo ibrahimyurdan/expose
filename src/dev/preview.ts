@@ -170,6 +170,8 @@ export function createPreviewBackend(): Bridge {
     onLobby: (handler) => subscribe(lobbyHandlers, handler),
     // the update check has already finished by the time anything listens.
     onUpdate: () => Promise.resolve(() => {}),
+    // the champion table is there from the start, so it never changes.
+    onChampions: () => Promise.resolve(() => {}),
     onNotice: (handler) => {
       // once, however often the provider resubscribes (strict mode mounts twice).
       if (query.get("notice") === "1" && !noticeScheduled) {

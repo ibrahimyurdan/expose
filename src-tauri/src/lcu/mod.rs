@@ -5,7 +5,7 @@ pub mod auth;
 pub mod client;
 pub mod websocket;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -24,6 +24,12 @@ use websocket::{LcuEvent, WsStream, CHAMP_SELECT_EVENT, READY_CHECK_EVENT};
 // how often we re-check for the client when not connected. a file watcher wakes
 // us sooner than this when the lockfile appears, so this is just the ceiling.
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+// how often a missing lockfile falls back to scanning the process table, the
+// costly step. a watched lockfile wakes the loop as soon as league starts, so
+// the scan only matters for unusual installs and can be rare.
+const SCAN_EVERY_WATCHED: Duration = Duration::from_secs(30);
+const SCAN_EVERY: Duration = Duration::from_secs(5);
 
 // how often we ping the event socket, and how long we tolerate hearing nothing
 // back before forcing a reconnect. this catches a silently half-open socket (a
@@ -69,11 +75,17 @@ pub async fn supervise(app: AppHandle) {
         None => (None, None),
     };
 
+    let mut last_scan: Option<Instant> = None;
     loop {
-        // credential discovery scans the full process table and reads lockfiles,
+        // credential discovery reads lockfiles and may scan the process table,
         // both blocking; run it off the async runtime so it cannot stall other
         // tasks during a reconnect storm.
-        let credentials = tokio::task::spawn_blocking(auth::find_credentials)
+        let now = Instant::now();
+        let scan = scan_due(last_scan, now, wake.is_some());
+        if scan {
+            last_scan = Some(now);
+        }
+        let credentials = tokio::task::spawn_blocking(move || auth::find_credentials(scan))
             .await
             .ok()
             .flatten();
@@ -134,6 +146,8 @@ async fn run_session(app: &AppHandle, credentials: &Credentials) -> Result<()> {
     let stream = websocket::connect(credentials).await?;
     log::info!("connected to the league client event stream");
     features::set_status(app, ConnectionStatus::Connected);
+    // league connecting is the moment a new patch may have landed.
+    tauri::async_runtime::spawn(crate::ddragon::refresh(app.clone()));
     read_loop(app, &client, stream).await;
     Ok(())
 }
@@ -195,6 +209,17 @@ async fn dispatch(app: &AppHandle, client: &LcuClient, event: LcuEvent) {
     }
 }
 
+// whether this attempt may scan the process table: always the first time,
+// then once per interval.
+fn scan_due(last: Option<Instant>, now: Instant, watching: bool) -> bool {
+    let every = if watching {
+        SCAN_EVERY_WATCHED
+    } else {
+        SCAN_EVERY
+    };
+    last.is_none_or(|last| now.duration_since(last) >= every)
+}
+
 // sleeps until the poll interval elapses or the lockfile directory changes,
 // whichever comes first.
 async fn wait_for_next_attempt(wake: &mut Option<Receiver<()>>) {
@@ -237,4 +262,26 @@ fn spawn_lockfile_watcher() -> Option<(RecommendedWatcher, Receiver<()>)> {
     .ok()?;
     watcher.watch(&dir, RecursiveMode::NonRecursive).ok()?;
     Some((watcher, rx))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    #[test]
+    fn scans_rarely_while_the_lockfile_is_watched() {
+        let start = Instant::now();
+        let at = |secs: u64| start + Duration::from_secs(secs);
+        // the first attempt always may scan.
+        assert!(scan_due(None, start, true));
+        assert!(scan_due(None, start, false));
+        // a watched lockfile wakes the loop by itself, so scans are rare.
+        assert!(!scan_due(Some(start), at(10), true));
+        assert!(scan_due(Some(start), at(31), true));
+        // without a watcher the scan is the only way to notice league.
+        assert!(!scan_due(Some(start), at(4), false));
+        assert!(scan_due(Some(start), at(6), false));
+    }
 }

@@ -309,10 +309,19 @@ fn publish(app: &AppHandle) {
     lobby.session = Some(session);
     log_matches(&mut lobby, view.unmatched.len());
     log_turn(&mut lobby, view.stage, view.acting);
+    if !should_publish(state.lobby_view.read().as_ref(), &view) {
+        return;
+    }
     *state.lobby_view.write() = Some(view.clone());
     if let Err(error) = app.emit(EVENT_LOBBY, &view) {
         log::warn!("could not emit the lobby: {error}");
     }
+}
+
+// a view equal to the one the frontend already has changes nothing on screen,
+// so it is not sent again (stats or settings often rebuild the same view).
+fn should_publish(previous: Option<&LobbyView>, next: &LobbyView) -> bool {
+    previous != Some(next)
 }
 
 // works out who sits in each slot: the exact steps first, then a guess for
@@ -756,6 +765,27 @@ mod tests {
             session: Some(session),
             ..LobbyState::default()
         }
+    }
+
+    #[test]
+    fn identical_views_are_not_sent_again() {
+        let session = ranked();
+        let mut state = lobby(ranked());
+        let scout = ScoutContext {
+            provider: "opgg".to_string(),
+            region: None,
+        };
+        let dodge = view::DodgeView {
+            armed: false,
+            lead_ms: 1500,
+        };
+        let view = build_view(&session, &mut state, &|_| None, &scout, dodge, 0);
+
+        assert!(should_publish(None, &view));
+        assert!(!should_publish(Some(&view), &view.clone()));
+        let mut later = view.clone();
+        later.time_left_ms -= 1000;
+        assert!(should_publish(Some(&view), &later));
     }
 
     fn candidate(puuid: &str, game_name: &str) -> Candidate {
