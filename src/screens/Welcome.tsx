@@ -1,65 +1,69 @@
-import { CircleCheck, DoorOpen, Eye, Users, type LucideIcon } from "lucide-react";
+import { useId, type ComponentType, type SVGProps } from "react";
 
+import { FineGlyph, SearchGlyph, WarnGlyph } from "@/components/art/glyphs";
+import { Mark } from "@/components/art/Mark";
+import { Ornament } from "@/components/art/Ornament";
+import { RiotNotice } from "@/components/shell/RiotNotice";
 import { Button } from "@/components/ui/button";
+import { Frame } from "@/components/ui/frame";
 
-const POINTS: { icon: LucideIcon; title: string; text: string }[] = [
+const POINTS: { Glyph: ComponentType<SVGProps<SVGSVGElement>>; title: string; text: string }[] = [
   {
-    icon: Users,
+    Glyph: SearchGlyph,
     title: "See who you're queued with",
     text: "Rank, recent games and red flags for every teammate, even when ranked hides their names.",
   },
   {
-    icon: CircleCheck,
+    Glyph: FineGlyph,
     title: "Auto-accept ready checks",
     text: "Step away while you queue. Expose accepts the match for you.",
   },
   {
-    icon: DoorOpen,
+    Glyph: WarnGlyph,
     title: "Dodge now or at the last second",
     text: "Leave a lobby with two clicks, or arm a dodge that fires just before it locks in.",
   },
 ];
 
-// the first-run screen: what expose does, in three lines, and one way forward.
-// it shows until "get started" is pressed once.
+// the first-run screen: a framed card with what expose does, in three lines,
+// and one way forward, on the card's bottom edge. it shows until "get
+// started" is pressed once. riot's notice sits under the card.
 export function Welcome({ onStart }: { onStart: () => void }) {
+  const titleId = useId();
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-8 px-6 pt-8 pb-16">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <span
-          aria-hidden
-          className="flex size-14 items-center justify-center rounded-full bg-accent/10 text-accent"
-        >
-          <Eye className="size-7" strokeWidth={2} />
-        </span>
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold text-fg">Welcome to Expose</h1>
-          <p className="text-base text-fg-secondary">
-            Your champ select companion for League of Legends.
-          </p>
+    <div className="welcome">
+      <Frame lips role="region" aria-labelledby={titleId} className="welcome-card">
+        <Mark size={40} />
+        <h1 id={titleId} className="welcome-title type-h3">
+          Welcome to Expose
+        </h1>
+        <Ornament className="welcome-ornament" />
+        <p className="welcome-subtitle type-label">
+          Your champ select companion for League of Legends.
+        </p>
+
+        <ul className="welcome-points">
+          {POINTS.map(({ Glyph, title, text }) => (
+            <li key={title}>
+              <Glyph className="welcome-glyph" />
+              <div>
+                <p className="type-h5">{title}</p>
+                <p className="type-body-m">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="edge-actions">
+          <div className="edge-actions-group">
+            <Button variant="primary" onClick={onStart}>
+              Get started
+            </Button>
+          </div>
         </div>
-      </div>
+      </Frame>
 
-      <ul className="flex flex-col gap-4">
-        {POINTS.map(({ icon: Icon, title, text }) => (
-          <li key={title} className="flex gap-3">
-            <span
-              aria-hidden
-              className="flex size-8 shrink-0 items-center justify-center rounded-control border border-border bg-surface text-fg-secondary"
-            >
-              <Icon className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-base font-medium text-fg">{title}</p>
-              <p className="text-sm text-fg-secondary">{text}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <Button variant="primary" className="w-full" onClick={onStart}>
-        Get started
-      </Button>
+      <RiotNotice className="welcome-notice type-tiny" />
     </div>
   );
 }

@@ -1,0 +1,276 @@
+/*
+  the screens around champ select: welcome (the first run), idle (connected,
+  between games) and settings. waiting is the empty state in controls.css.
+*/
+@layer components {
+  /* ---------- welcome ---------- */
+  /* a framed card in the middle, riot's notice under it. */
+  .welcome {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 16px;
+  }
+  .welcome-card {
+    width: min(100%, 388px);
+    box-sizing: border-box;
+    padding: 24px 18px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .welcome-title {
+    margin-top: 12px;
+  }
+  /* under the title as its divider: "welcome to expose" leaves no room for
+     it beside the title. */
+  .welcome-ornament {
+    margin-top: 8px;
+  }
+  .welcome-subtitle {
+    margin-top: 8px;
+  }
+  .welcome-points {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 22px;
+    text-align: left;
+  }
+  .welcome-points > li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .welcome-points .type-body-m {
+    margin-top: 2px;
+  }
+  .welcome-glyph {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    color: var(--gold-2);
+  }
+  .welcome-notice {
+    max-width: 388px;
+    margin-top: 28px;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  /* buttons that sit on a frame's bottom edge. the group covers the edge
+     behind it, and a short gold post stands at each end, its top cut at 45°
+     where a clear top border meets it. */
+  .edge-actions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .edge-actions-group {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    padding: 0 6px;
+    background: var(--bg);
+    pointer-events: auto;
+  }
+  .edge-actions-group::before,
+  .edge-actions-group::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    width: 0;
+    height: 10px;
+    border-top: 2px solid transparent;
+  }
+  .edge-actions-group::before {
+    left: 0;
+    border-left: 2px solid var(--line-post);
+  }
+  .edge-actions-group::after {
+    right: 0;
+    border-right: 2px solid var(--line-post);
+  }
+
+  /* ---------- idle ---------- */
+  /* the auto-accept card and what comes next, then the last lobby. */
+  .idle {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+    padding: 24px 16px 64px;
+  }
+  .idle-mode {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .auto-accept {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+  }
+  .auto-accept-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .auto-accept-text .type-body {
+    margin-top: 2px;
+  }
+  .idle-next {
+    padding: 0 2px;
+  }
+  .last-lobby-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+  .last-lobby-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .last-lobby-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .last-lobby-top > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .last-lobby-top > .chip {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  /* ---------- settings ---------- */
+  /* the title is a breadcrumb: the app, a slash, then this page brightest. */
+  .settings-title {
+    height: 48px;
+    margin: 0 9px;
+    padding: 0 11px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-window);
+  }
+  .crumb,
+  .crumb-break {
+    color: var(--text-secondary);
+  }
+  .crumb-break {
+    padding: 0 3px;
+  }
+  .crumb-current {
+    color: var(--gold-1);
+  }
+  .settings-options {
+    padding: 15px 20px 28px;
+  }
+  .settings-section + .settings-section {
+    margin-top: 20px;
+  }
+  .section-title {
+    margin-bottom: 10px;
+  }
+  .setting {
+    margin-bottom: 15px;
+  }
+  /* the row label: the label role in pale gold with the client's settings
+     tracking, .025em, rather than the .1em of a bare label. set in full
+     here, since a type utility would win over this layer. */
+  .setting-label {
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--gold-2);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .setting .select {
+    margin-top: 8px;
+  }
+  .setting--action {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .setting--action > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .setting--action > button {
+    flex: none;
+  }
+
+  /* riot's notice and the font credits close the page. */
+  .legal {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+  }
+  .font-credits {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-wrap: anywhere;
+  }
+  .licenses {
+    margin-top: 6px;
+  }
+  /* the disclosure's own marker is replaced by the details triangle. */
+  .licenses > summary {
+    width: fit-content;
+    list-style: none;
+    cursor: pointer;
+    font: 400 12px/16px var(--font-body);
+    letter-spacing: 0.025em;
+    color: var(--gold-2);
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+  .licenses > summary::-webkit-details-marker {
+    display: none;
+  }
+  .licenses > summary::before {
+    content: "";
+    display: inline-block;
+    margin-right: 7px;
+    border-style: solid;
+    border-width: 4px 0 4px 5px;
+    border-color: transparent transparent transparent currentColor;
+    transition: transform 0.2s cubic-bezier(0, 0, 0, 1);
+  }
+  .licenses[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  .licenses > summary:hover,
+  .licenses > summary:focus-visible {
+    color: var(--gold-1);
+  }
+  .license-text {
+    max-height: 200px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--surface-well);
+    border: 1px solid var(--border-window);
+  }
+}

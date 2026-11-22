@@ -1,15 +1,15 @@
 import { useId, type ReactNode } from "react";
 
+import { FontCredits } from "@/components/shell/FontCredits";
+import { RiotNotice } from "@/components/shell/RiotNotice";
 import { Button } from "@/components/ui/button";
-import { Panel } from "@/components/ui/frame";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, type RadioOption } from "@/components/ui/radio-group";
 import { Select, type SelectOption } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { usePushNotice } from "@/hooks/notices";
 import type { useSettings } from "@/hooks/useSettings";
 import { bridge } from "@/lib/bridge";
 import { formatSeconds } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { ScoutProvider, UpdateInfo } from "@/types";
 
 const PROVIDERS: readonly RadioOption<ScoutProvider>[] = [
@@ -23,13 +23,16 @@ const LEAD_TIMES: readonly SelectOption<number>[] = [1000, 1500, 2000, 3000].map
   label: formatSeconds(ms),
 }));
 
-// the ids a row hands its control, so the control is named by the row's
-// visible label and described by its hint.
+// the ids a choice row hands its control, so the control is named by the
+// row's visible label and described by its hint.
 interface RowLabels {
   "aria-labelledby": string;
   "aria-describedby": string;
 }
 
+// the client's settings page: a breadcrumb title over a plain list, with no
+// cards. on/off settings are checkboxes, choices sit under their label, and
+// actions put a thin button at the row's end.
 export function Settings({
   controls,
   autoAccept,
@@ -57,76 +60,88 @@ export function Settings({
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 pb-8">
-      <h1 className="px-1 text-md font-semibold text-fg">Settings</h1>
+    <div className="settings">
+      <div className="settings-title">
+        <h1 className="type-h4">
+          <span className="crumb">Expose</span>
+          <span aria-hidden className="crumb-break">
+            /
+          </span>
+          <span className="crumb-current">Settings</span>
+        </h1>
+      </div>
 
-      <Section title="General">
-        <Row label="Launch at login" hint="Start Expose when you sign in to your computer.">
-          {(labels) => (
-            <Switch checked={settings.launchAtLogin} onCheckedChange={setLaunchAtLogin} {...labels} />
-          )}
-        </Row>
-        <Row label="Auto-accept" hint="Accept the ready check as soon as a match is found.">
-          {(labels) => (
-            <Switch checked={autoAccept} onCheckedChange={onAutoAcceptChange} {...labels} />
-          )}
-        </Row>
-      </Section>
+      <div className="settings-options">
+        <Section title="General">
+          <div className="setting">
+            <Checkbox
+              checked={settings.launchAtLogin}
+              onCheckedChange={setLaunchAtLogin}
+              label="Launch at login"
+              hint="Start Expose when you sign in to your computer."
+            />
+          </div>
+          <div className="setting">
+            <Checkbox
+              checked={autoAccept}
+              onCheckedChange={onAutoAcceptChange}
+              label="Auto-accept"
+              hint="Accept the ready check as soon as a match is found."
+            />
+          </div>
+        </Section>
 
-      <Section title="Champ select">
-        <Row
-          label="Reveal and match ranked teammates"
-          hint="Show who is behind each alias in ranked solo/duo."
-        >
-          {(labels) => (
-            <Switch
+        <Section title="Champ select">
+          <div className="setting">
+            <Checkbox
               checked={settings.revealRanked}
               onCheckedChange={controls.setRevealRanked}
-              {...labels}
+              label="Reveal and match ranked teammates"
+              hint="Show who is behind each alias in ranked solo/duo."
             />
-          )}
-        </Row>
-        <Row
-          label="Open scout site automatically"
-          hint="Open your team on the scout site when champ select starts."
-        >
-          {(labels) => (
-            <Switch checked={settings.autoOpen} onCheckedChange={controls.setAutoOpen} {...labels} />
-          )}
-        </Row>
-        <Row label="Scout site" hint="Used for profile links and for scouting your team.">
-          {(labels) => (
-            <RadioGroup
-              value={settings.scoutProvider}
-              options={PROVIDERS}
-              onChange={controls.setScoutProvider}
-              {...labels}
+          </div>
+          <div className="setting">
+            <Checkbox
+              checked={settings.autoOpen}
+              onCheckedChange={controls.setAutoOpen}
+              label="Open scout site automatically"
+              hint="Open your team on the scout site when champ select starts."
             />
-          )}
-        </Row>
-      </Section>
+          </div>
+          <Choice label="Scout site" hint="Used for profile links and for scouting your team.">
+            {(labels) => (
+              <RadioGroup
+                value={settings.scoutProvider}
+                options={PROVIDERS}
+                onChange={controls.setScoutProvider}
+                {...labels}
+              />
+            )}
+          </Choice>
+        </Section>
 
-      <Section title="Dodge">
-        <Row
-          label="Last-second lead time"
-          hint="An armed last-second dodge leaves the lobby with this much time left."
-          stacked
-        >
-          {(labels) => (
-            <Select
-              value={settings.dodgeLeadMs}
-              options={LEAD_TIMES}
-              onChange={controls.setDodgeLead}
-              aria-labelledby={labels["aria-labelledby"]}
-            />
-          )}
-        </Row>
-      </Section>
+        <Section title="Dodge">
+          <Choice
+            label="Last-second lead time"
+            hint="An armed last-second dodge leaves the lobby with this much time left."
+          >
+            {(labels) => (
+              <Select
+                value={settings.dodgeLeadMs}
+                options={LEAD_TIMES}
+                onChange={controls.setDodgeLead}
+                aria-labelledby={labels["aria-labelledby"]}
+              />
+            )}
+          </Choice>
+        </Section>
 
-      <Section title="About">
-        <Row label={update?.current ? `Expose ${update.current}` : "Expose"} hint={updateHint(update)}>
-          {() =>
-            update?.available ? (
+        <Section title="About">
+          <Action
+            label={update?.current ? `Expose ${update.current}` : "Expose"}
+            hint={updateHint(update)}
+          >
+            {update?.available ? (
               <Button
                 variant="thin"
                 external
@@ -134,17 +149,19 @@ export function Settings({
               >
                 Get {update.latest}
               </Button>
-            ) : null
-          }
-        </Row>
-        <Row label="Logs" hint="Useful when you report a problem.">
-          {() => (
+            ) : null}
+          </Action>
+          <Action label="Logs" hint="Useful when you report a problem.">
             <Button variant="thin" onClick={openLogsFolder}>
               Open logs folder
             </Button>
-          )}
-        </Row>
-      </Section>
+          </Action>
+          <div className="legal">
+            <RiotNotice className="type-body" />
+            <FontCredits />
+          </div>
+        </Section>
+      </div>
     </div>
   );
 }
@@ -163,26 +180,23 @@ function updateHint(update: UpdateInfo | null): string {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h2 id={id} className="px-1 text-sm font-medium text-fg-secondary">
+    <section aria-labelledby={id} className="settings-section">
+      <h2 id={id} className="section-title type-h5">
         {title}
       </h2>
-      <Panel className="divide-y divide-border">{children}</Panel>
+      {children}
     </section>
   );
 }
 
-// one setting: its label and hint on the left, the control on the right, or
-// below them when the control is too wide to share the line (stacked).
-function Row({
+// a setting with a choice: its label and hint, then the control under them.
+function Choice({
   label,
   hint,
-  stacked = false,
   children,
 }: {
   label: string;
   hint: string;
-  stacked?: boolean;
   children: (labels: RowLabels) => ReactNode;
 }) {
   const id = useId();
@@ -191,16 +205,27 @@ function Row({
     "aria-describedby": `${id}-hint`,
   };
   return (
-    <div className={cn("flex gap-4 px-4 py-3", stacked ? "flex-col gap-3" : "items-center")}>
-      <div className="min-w-0 flex-1">
-        <p id={labels["aria-labelledby"]} className="text-base text-fg">
-          {label}
-        </p>
-        <p id={labels["aria-describedby"]} className="text-sm text-fg-secondary">
-          {hint}
-        </p>
-      </div>
+    <div className="setting">
+      <p id={labels["aria-labelledby"]} className="setting-label">
+        {label}
+      </p>
+      <p id={labels["aria-describedby"]} className="type-body">
+        {hint}
+      </p>
       {children(labels)}
+    </div>
+  );
+}
+
+// a row with an action: its label and hint, and a button at the end.
+function Action({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
+  return (
+    <div className="setting setting--action">
+      <div>
+        <p className="setting-label">{label}</p>
+        <p className="type-body">{hint}</p>
+      </div>
+      {children}
     </div>
   );
 }

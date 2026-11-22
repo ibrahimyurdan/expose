@@ -14,6 +14,7 @@ interface CheckboxProps {
 // an on/off setting: a small gold box, the label beside it, a hint under the
 // label. space and enter toggle it like any button.
 function Checkbox({ checked, onCheckedChange, label, hint, disabled = false }: CheckboxProps) {
+  const labelId = useId();
   const hintId = useId();
   return (
     <button
@@ -21,6 +22,9 @@ function Checkbox({ checked, onCheckedChange, label, hint, disabled = false }: C
       role="checkbox"
       aria-checked={checked}
       aria-disabled={disabled || undefined}
+      // named by the label alone; the hint inside is its description, not
+      // part of its name.
+      aria-labelledby={labelId}
       aria-describedby={hint ? hintId : undefined}
       className="check"
       onClick={() => {
@@ -33,7 +37,9 @@ function Checkbox({ checked, onCheckedChange, label, hint, disabled = false }: C
         <CheckGlyph />
       </span>
       <span className="check-text">
-        <span className="check-label">{label}</span>
+        <span id={labelId} className="check-label">
+          {label}
+        </span>
         {hint && (
           <span id={hintId} className="type-body">
             {hint}
