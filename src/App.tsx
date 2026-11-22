@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Header } from "@/components/shell/Header";
 import { Notices } from "@/components/shell/Notices";
@@ -20,7 +20,17 @@ import type { ConnectionStatus } from "@/types";
 
 type Screen = "loading" | "welcome" | "waiting" | "idle" | "lobby" | "settings";
 
+// the drawing gallery, a dev page that only the browser preview ever loads.
+const Gallery = lazy(() => import("@/dev/Gallery"));
+
 export default function App() {
+  if (previewScreen() === "gallery") {
+    return (
+      <Suspense fallback={null}>
+        <Gallery />
+      </Suspense>
+    );
+  }
   return (
     <NoticeProvider>
       <TooltipProvider>

@@ -91,9 +91,17 @@ const tauriBridge: Bridge = {
 // true when the ui runs in a plain browser instead of the app.
 export const isPreview = !("__TAURI_INTERNALS__" in window);
 
-export type PreviewScreen = "waiting" | "idle" | "lobby" | "settings" | "welcome";
+// gallery is a dev page with every drawing on it (src/dev/Gallery.tsx).
+export type PreviewScreen = "waiting" | "idle" | "lobby" | "settings" | "welcome" | "gallery";
 
-const PREVIEW_SCREENS: readonly PreviewScreen[] = ["waiting", "idle", "lobby", "settings", "welcome"];
+const PREVIEW_SCREENS: readonly PreviewScreen[] = [
+  "waiting",
+  "idle",
+  "lobby",
+  "settings",
+  "welcome",
+  "gallery",
+];
 
 // the screen a browser preview was asked for with ?screen= (the lobby when the
 // query names none), or null inside the app.

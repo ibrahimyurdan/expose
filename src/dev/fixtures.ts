@@ -86,6 +86,7 @@ export function statusFor(screen: PreviewScreen): ConnectionStatus {
       return "champSelect";
     case "idle":
     case "settings":
+    case "gallery":
       return "connected";
   }
 }
