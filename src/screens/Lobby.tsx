@@ -109,7 +109,7 @@ function Unmatched({ names }: { names: NameView[] }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2 px-1">
-      <h2 id={id} className="text-sm font-medium text-fg-secondary">
+      <h2 id={id} className="type-subhead">
         Also in your lobby
       </h2>
       <ul className="flex flex-wrap gap-1">

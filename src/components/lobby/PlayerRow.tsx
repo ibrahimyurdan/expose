@@ -104,7 +104,7 @@ export function PlayerRow({
     <li
       ref={entry}
       style={style}
-      className="animate-in duration-300 fill-mode-backwards fade-in-0"
+      className="fade-in-slow"
     >
       <article
         aria-label={title}

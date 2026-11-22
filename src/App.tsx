@@ -194,7 +194,7 @@ function Shell() {
           key={screen}
           className={cn(
             "flex min-h-full flex-col",
-            fadeScreens && "animate-in duration-200 fade-in-0",
+            fadeScreens && "fade-in",
           )}
         >
           {content}

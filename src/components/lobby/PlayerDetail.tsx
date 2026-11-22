@@ -45,7 +45,7 @@ export function PlayerDetail({
   const ranked = rank ? rank.wins + rank.losses : 0;
 
   return (
-    <Raised id={id} className="details animate-in duration-200 fade-in-0">
+    <Raised id={id} className="details fade-in">
       <svg className="details-caret" viewBox="0 0 22 11" aria-hidden focusable={false}>
         <path d="M0 11 11 0 22 11Z" fill="var(--surface)" />
         <path d="M1 11 11 1 21 11" fill="none" stroke="#785a28" strokeWidth="2" />
