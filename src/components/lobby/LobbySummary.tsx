@@ -1,15 +1,10 @@
-import {
-  EyeOff,
-  ScanSearch,
-  ShieldAlert,
-  ShieldCheck,
-  ShieldEllipsis,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 
+import { FineGlyph, SearchGlyph, WarnGlyph } from "@/components/art/glyphs";
 import { DodgeControl } from "@/components/lobby/DodgeControl";
+import { Frame } from "@/components/ui/frame";
 import { IconButton } from "@/components/ui/icon-button";
+import { Loader } from "@/components/ui/loader";
 import { usePushNotice } from "@/hooks/notices";
 import { bridge } from "@/lib/bridge";
 import { capitalize, plural } from "@/lib/format";
@@ -18,19 +13,15 @@ import type { LobbyView } from "@/types";
 
 type Tone = "red" | "amber" | "neutral";
 
-const TONES: Record<Tone, { card: string; icon: string }> = {
-  red: { card: "border-red/25 bg-red-bg", icon: "text-red" },
-  amber: { card: "border-amber/25 bg-amber-bg", icon: "text-amber" },
-  neutral: { card: "border-border bg-surface", icon: "text-fg-secondary" },
-};
-
 interface Verdict {
   tone: Tone;
-  icon: LucideIcon;
-  // the all-clear keeps a neutral card but a green shield.
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  // the all-clear keeps a neutral card but a green check.
   clear?: boolean;
   title: string;
   detail: string;
+  // the detail says teammates are still being checked: the dots bounce.
+  checking?: boolean;
 }
 
 // the one-line read on the lobby, worded so it never sounds surer than the
@@ -59,33 +50,36 @@ function verdictFor(lobby: LobbyView, revealRanked: boolean): Verdict {
   if (summary.redFlags > 0) {
     return {
       tone: "red",
-      icon: ShieldAlert,
+      icon: WarnGlyph,
       title: capitalize(summary.label),
       detail:
         stillChecking ??
         (summary.warnings > 0 ? `Plus ${plural(summary.warnings, "warning")}` : coverage),
+      checking: stillChecking !== null,
     };
   }
   if (summary.warnings > 0) {
     return {
       tone: "amber",
-      icon: TriangleAlert,
+      icon: WarnGlyph,
       title: capitalize(summary.label),
       detail: stillChecking ?? coverage,
+      checking: stillChecking !== null,
     };
   }
   if (checked === 0 && teammates.length > 0) {
     if (loading > 0) {
       return {
         tone: "neutral",
-        icon: ShieldEllipsis,
+        icon: SearchGlyph,
         title: "Checking your teammates",
         detail: stillChecking ?? coverage,
+        checking: stillChecking !== null,
       };
     }
     return {
       tone: "neutral",
-      icon: EyeOff,
+      icon: WarnGlyph,
       title: "Couldn't check your teammates",
       detail:
         !lobby.anonymous || named > 0
@@ -97,11 +91,12 @@ function verdictFor(lobby: LobbyView, revealRanked: boolean): Verdict {
   }
   return {
     tone: "neutral",
-    icon: loading > 0 ? ShieldEllipsis : ShieldCheck,
+    icon: loading > 0 ? SearchGlyph : FineGlyph,
     // green only when every teammate was actually checked.
     clear: loading === 0 && checked === teammates.length,
     title: loading > 0 ? "No red flags so far" : capitalize(summary.label),
     detail: stillChecking ?? coverage,
+    checking: stillChecking !== null,
   };
 }
 
@@ -119,7 +114,6 @@ export function LobbySummary({
 }) {
   const push = usePushNotice();
   const verdict = verdictFor(lobby, revealRanked);
-  const tone = TONES[verdict.tone];
   const Icon = verdict.icon;
 
   // scouting needs at least one teammate's riot id, matched or not.
@@ -134,17 +128,22 @@ export function LobbySummary({
   };
 
   return (
-    <section
+    <Frame
+      lips
+      role="region"
       aria-label="Lobby summary"
-      className={cn("flex flex-col gap-3 rounded-card border p-3 transition-colors", tone.card)}
+      className={cn("summary", `summary--${verdict.tone}`, verdict.clear && "summary--clear")}
     >
-      <div className="flex items-center gap-3">
-        <Icon className={cn("size-5 shrink-0", verdict.clear ? "text-green" : tone.icon)} aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p aria-live="polite" className="truncate text-base font-semibold text-fg">
+      <div className="summary-head">
+        <Icon className="summary-icon" />
+        <div className="summary-text">
+          <p aria-live="polite" className="summary-title type-h5">
             {verdict.title}
           </p>
-          <p className="truncate text-sm text-fg-secondary">{verdict.detail}</p>
+          <p className="summary-detail type-body">
+            {verdict.detail}
+            {verdict.checking ? <Loader /> : null}
+          </p>
         </div>
         <IconButton
           label={`Scout your team on ${scoutLabel}`}
@@ -152,10 +151,10 @@ export function LobbySummary({
           onClick={scout}
           disabled={!canScout}
         >
-          <ScanSearch aria-hidden />
+          <SearchGlyph />
         </IconButton>
       </div>
       <DodgeControl lobby={lobby} />
-    </section>
+    </Frame>
   );
 }

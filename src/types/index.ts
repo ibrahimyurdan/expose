@@ -27,6 +27,13 @@ export type FlagKind =
   | "freshAccount"
   | "noData";
 
+// where champ select stands. unknown when the session does not say (a pick
+// and ban phase with nobody on the clock, say).
+export type Stage = "unknown" | "planning" | "ban" | "pick" | "finalization";
+
+// which team is on a ban or pick turn right now.
+export type Acting = "none" | "ally" | "enemy" | "both";
+
 export interface LobbyView {
   gameId: number;
   queueId: number;
@@ -34,6 +41,10 @@ export interface LobbyView {
   phase: string;
   // time left in the phase when the backend built this view.
   timeLeftMs: number;
+  // the phase's full length; 0 when unknown.
+  totalMs: number;
+  stage: Stage;
+  acting: Acting;
   // true when riot hides teammate names (ranked solo/duo).
   anonymous: boolean;
   // your team in slot order, you included.
@@ -68,6 +79,8 @@ export interface PlayerView {
   // red first, then amber, then info.
   flags: Flag[];
   scoutUrl: string | null;
+  // banning or picking right now.
+  acting: boolean;
 }
 
 export interface IdentityView {

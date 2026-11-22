@@ -1,13 +1,11 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
+import { Band } from "@/components/lobby/Band";
 import { LobbySummary } from "@/components/lobby/LobbySummary";
 import { PlayerRow } from "@/components/lobby/PlayerRow";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useCountdown } from "@/hooks/useCountdown";
-import { lobbyReceivedAt } from "@/hooks/useLobby";
-import { formatClock, phaseLabel, queueName, riotId } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { riotId } from "@/lib/format";
 import type { ChampionData, LobbyView, NameView, Settings } from "@/types";
 
 // champ select: the clock and the verdict on your team pinned on top (with the
@@ -59,19 +57,13 @@ function ChampSelect({
   return (
     <div className="flex flex-1 flex-col">
       <div ref={sentinel} aria-hidden className="h-px shrink-0" />
-      <div
-        className={cn(
-          "sticky top-0 z-10 -mt-px flex flex-col gap-2 border-b bg-canvas px-4 py-2 transition-colors",
-          stuck ? "border-border" : "border-transparent",
-        )}
-      >
-        <PhaseClock lobby={lobby} />
+      <Band lobby={lobby} stuck={stuck}>
         <LobbySummary
           lobby={lobby}
           revealRanked={settings.revealRanked}
           scoutLabel={scoutLabel}
         />
-      </div>
+      </Band>
 
       <div className="flex flex-col gap-4 px-4 pt-1 pb-4">
         <ul aria-label="Your team" className="flex flex-col gap-2">
@@ -92,75 +84,6 @@ function ChampSelect({
       </div>
     </div>
   );
-}
-
-// the phase, the queue and the time left, with a thin bar that empties as the
-// current turn runs out.
-function PhaseClock({ lobby }: { lobby: LobbyView }) {
-  const receivedAt = lobbyReceivedAt(lobby);
-  const left = useCountdown(lobby.timeLeftMs, receivedAt);
-  const length = useTurnLength(lobby, receivedAt);
-  const progress = length > 0 ? Math.min(1, left / length) : 0;
-  // with a last-second dodge armed while locking in, a tick marks where it fires.
-  const tick =
-    lobby.dodge.armed && lobby.phase === "FINALIZATION" && length > 0
-      ? Math.min(1, lobby.dodge.leadMs / length)
-      : null;
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex h-5 items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm">
-          <span className="font-medium text-fg">{phaseLabel(lobby.phase)}</span>
-          <span className="text-fg-secondary"> · {queueName(lobby.queueId)}</span>
-        </p>
-        <span
-          role="timer"
-          aria-label={`${formatClock(left)} left`}
-          className="shrink-0 text-md font-semibold text-fg tabular-nums"
-        >
-          {formatClock(left)}
-        </span>
-      </div>
-      <div aria-hidden className="relative h-0.5 overflow-hidden rounded-full bg-border">
-        <div
-          className="h-full origin-left rounded-full bg-accent transition-transform duration-300 ease-linear"
-          style={{ transform: `scaleX(${progress})` }}
-        />
-        {tick !== null ? (
-          <div className="absolute inset-y-0 w-0.5 bg-red" style={{ left: `${tick * 100}%` }} />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-// how long the current turn of the timer is, for the progress bar. the lobby
-// only reports the time left, so a turn starts with the first reading of a
-// phase, or when the time left jumps back up (the next pick in pick and ban).
-function useTurnLength(lobby: LobbyView, receivedAt: number): number {
-  const startOf = (view: LobbyView, at: number) => ({
-    view,
-    gameId: view.gameId,
-    phase: view.phase,
-    startedAt: at,
-    length: view.timeLeftMs,
-  });
-  const [turn, setTurn] = useState(() => startOf(lobby, receivedAt));
-
-  if (turn.view !== lobby) {
-    // what the old turn would have left by now; a reading well above it means
-    // the timer restarted.
-    const expected = turn.length - (receivedAt - turn.startedAt);
-    const fresh =
-      lobby.gameId !== turn.gameId ||
-      lobby.phase !== turn.phase ||
-      lobby.timeLeftMs > expected + 1000;
-    const next = fresh ? startOf(lobby, receivedAt) : { ...turn, view: lobby };
-    setTurn(next);
-    return next.length;
-  }
-  return turn.length;
 }
 
 // true once the list scrolls under the pinned band, so the band can show its

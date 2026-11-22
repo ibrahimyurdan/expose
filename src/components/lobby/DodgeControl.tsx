@@ -1,7 +1,7 @@
-import { DoorOpen } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import { DodgeShape } from "@/components/art/DodgeShape";
+import { ClockGlyph } from "@/components/art/glyphs";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePushNotice } from "@/hooks/notices";
@@ -23,7 +23,7 @@ const CONFIRM_GUARD_MS = 600;
 // button, which leaves now after a confirming second click.
 export function DodgeControl({ lobby }: { lobby: LobbyView }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="dodge-row">
       <LastSecond lobby={lobby} />
       <DodgeButton />
     </div>
@@ -75,33 +75,25 @@ function DodgeButton() {
   const confirming = stage === "confirm";
   return (
     <>
-      <Button
-        variant="framed"
+      <button
+        type="button"
+        className="dodge"
+        data-stage={stage}
         onClick={onClick}
         onKeyDown={onKeyDown}
         disabled={stage === "leaving"}
-        // one width for both labels, so nothing shifts while confirming.
-        className="relative w-32 overflow-hidden"
       >
-        {stage === "idle" ? (
-          <>
-            <DoorOpen aria-hidden />
-            Dodge
-          </>
-        ) : stage === "confirm" ? (
-          "Confirm dodge"
-        ) : (
-          "Dodging…"
-        )}
+        <DodgeShape />
+        {stage === "idle" ? "Dodge" : stage === "confirm" ? "Confirm" : "Dodging…"}
         {confirming ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-on-accent/50 [animation:drain_3s_linear_forwards]"
+            className="dodge-drain"
             // drains over exactly the confirm window.
             style={{ animationDuration: `${CONFIRM_MS}ms` }}
           />
         ) : null}
-      </Button>
+      </button>
       <span aria-live="assertive" className="sr-only">
         {confirming ? "Press again to dodge. The usual dodge penalty applies." : ""}
       </span>
@@ -141,10 +133,11 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
   const hint = `Leaves the lobby by itself with ${formatPreciseClock(lead)} left to lock in.`;
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="last-second">
       <Switch
         id={`${id}-switch`}
         danger
+        glyph={<ClockGlyph />}
         checked={armed}
         onCheckedChange={onChange}
         aria-label="Dodge at the last second"
@@ -155,8 +148,8 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
           <label
             htmlFor={`${id}-switch`}
             className={cn(
-              "min-w-0 truncate text-sm",
-              armed ? "font-medium text-red" : "text-fg-secondary",
+              armed ? "dodge-armed" : "type-label",
+              armed && lobby.stage === "finalization" && "is-final",
             )}
           >
             {armed ? <ArmedStatus lobby={lobby} /> : "Last second"}
@@ -175,7 +168,7 @@ function LastSecond({ lobby }: { lobby: LobbyView }) {
 // countdown to that moment, so the dodge never comes as a surprise.
 function ArmedStatus({ lobby }: { lobby: LobbyView }) {
   const lead = lobby.dodge.leadMs;
-  if (lobby.phase !== "FINALIZATION") {
+  if (lobby.stage !== "finalization" && lobby.phase !== "FINALIZATION") {
     return <>Dodges at {formatPreciseClock(lead)}</>;
   }
   return <FinalCountdown lobby={lobby} />;

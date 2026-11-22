@@ -6,6 +6,7 @@
 
 import type { PreviewScreen } from "@/lib/bridge";
 import type {
+  Acting,
   ChampionData,
   ConnectionStatus,
   Flag,
@@ -19,6 +20,7 @@ import type {
   RoleShare,
   ScoutProvider,
   Settings,
+  Stage,
   StatsView,
   Summary,
   UpdateInfo,
@@ -95,8 +97,9 @@ export function statusFor(screen: PreviewScreen): ConnectionStatus {
 // loading. guess: the key could not be recovered, so four best guesses.
 // resolving: the first moments of a ranked lobby, names known but not yet tied
 // to slots. hidden: a ranked lobby without the riot client, so no names at all.
-// normal: a draft game where nothing is hidden.
-export type LobbyVariant = "ranked" | "guess" | "resolving" | "hidden" | "normal";
+// normal: a draft game where nothing is hidden. pick: ranked again, with your
+// jungler on the clock to pick.
+export type LobbyVariant = "ranked" | "guess" | "resolving" | "hidden" | "normal" | "pick";
 
 export const LOBBY_VARIANTS: readonly LobbyVariant[] = [
   "ranked",
@@ -104,6 +107,7 @@ export const LOBBY_VARIANTS: readonly LobbyVariant[] = [
   "resolving",
   "hidden",
   "normal",
+  "pick",
 ];
 
 export interface LobbyOptions {
@@ -393,14 +397,71 @@ const DEFAULT_PENDING: Record<LobbyVariant, readonly string[]> = {
   resolving: [],
   hidden: [],
   normal: [],
+  pick: [],
 };
 
-const TIMERS: Record<LobbyVariant, { phase: string; timeLeftMs: number }> = {
-  ranked: { phase: "BAN_PICK", timeLeftMs: 27_000 },
-  guess: { phase: "BAN_PICK", timeLeftMs: 21_000 },
-  resolving: { phase: "PLANNING", timeLeftMs: 24_000 },
-  hidden: { phase: "BAN_PICK", timeLeftMs: 25_000 },
-  normal: { phase: "FINALIZATION", timeLeftMs: 9_000 },
+interface Timer {
+  phase: string;
+  timeLeftMs: number;
+  totalMs: number;
+  stage: Stage;
+  acting: Acting;
+  // the cells of your team on the clock.
+  actingCells: readonly number[];
+}
+
+// ranked: simultaneous bans, everyone banning. guess: the enemy picks.
+// resolving: planning. hidden: your bot laner picks. normal: lock-in. pick:
+// your jungler picks.
+const TIMERS: Record<LobbyVariant, Timer> = {
+  ranked: {
+    phase: "BAN_PICK",
+    timeLeftMs: 27_000,
+    totalMs: 30_000,
+    stage: "ban",
+    acting: "both",
+    actingCells: [0, 1, 2, 3, 4],
+  },
+  guess: {
+    phase: "BAN_PICK",
+    timeLeftMs: 21_000,
+    totalMs: 30_000,
+    stage: "pick",
+    acting: "enemy",
+    actingCells: [],
+  },
+  resolving: {
+    phase: "PLANNING",
+    timeLeftMs: 24_000,
+    totalMs: 30_000,
+    stage: "planning",
+    acting: "none",
+    actingCells: [],
+  },
+  hidden: {
+    phase: "BAN_PICK",
+    timeLeftMs: 25_000,
+    totalMs: 30_000,
+    stage: "pick",
+    acting: "ally",
+    actingCells: [3],
+  },
+  normal: {
+    phase: "FINALIZATION",
+    timeLeftMs: 9_000,
+    totalMs: 30_000,
+    stage: "finalization",
+    acting: "none",
+    actingCells: [],
+  },
+  pick: {
+    phase: "BAN_PICK",
+    timeLeftMs: 22_000,
+    totalMs: 30_000,
+    stage: "pick",
+    acting: "ally",
+    actingCells: [1],
+  },
 };
 
 function matchKind(player: FixturePlayer, variant: LobbyVariant): MatchKind {
@@ -422,6 +483,7 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
   const provider = options.provider ?? "opgg";
   const pending = options.pending ?? DEFAULT_PENDING[variant];
   const anonymous = variant !== "normal";
+  const { actingCells, ...timer } = TIMERS[variant];
 
   const players = TEAM.map((player): PlayerView => {
     const resolved = player.isSelf || (variant !== "resolving" && variant !== "hidden");
@@ -448,6 +510,7 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
       statsPending: loading,
       flags: stats && !player.isSelf ? player.flags : [],
       scoutUrl: resolved ? profileUrl(provider, player.name) : null,
+      acting: actingCells.includes(player.cellId),
     };
   });
 
@@ -463,7 +526,7 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
   return {
     gameId: variant === "normal" ? 5_210_351_266 : 5_210_337_904,
     queueId: variant === "normal" ? 400 : 420,
-    ...TIMERS[variant],
+    ...timer,
     anonymous,
     players,
     unmatched,

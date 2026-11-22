@@ -1,0 +1,302 @@
+/*
+  champ select: the band pinned at the top (the phase, the clock between two
+  draining bars framed in gold metal-work, the queue), the verdict card with
+  the dodge controls, then the team.
+*/
+@layer components {
+  /* the band and the verdict card under it stay pinned while the team
+     scrolls; once stuck, a short fade hangs under them. */
+  .band {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding: 10px 16px 12px;
+  }
+  .band.is-stuck::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 16px;
+    background: var(--band-fade);
+    pointer-events: none;
+  }
+  .band-head {
+    text-shadow: var(--shadow-text-art);
+  }
+  .band-phase {
+    text-align: center;
+  }
+  .band-clock-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .band-clock {
+    width: 56px;
+    flex: none;
+    text-align: center;
+  }
+  .metal {
+    position: absolute;
+    top: -1px;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .metal--left {
+    left: 0;
+  }
+  .metal--right {
+    right: 0;
+  }
+  /* the base lines run from the metal-work under the bars to the clock. */
+  .band-clock-row::before,
+  .band-clock-row::after {
+    content: "";
+    position: absolute;
+    top: 18.5px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .band-clock-row::before {
+    left: 48px;
+    right: calc(50% + 28px);
+    background: linear-gradient(90deg, #5e481e, #785a28 39%);
+  }
+  .band-clock-row::after {
+    right: 48px;
+    left: calc(50% + 28px);
+    background: linear-gradient(270deg, #5e481e, #785a28 39%);
+  }
+  /* each bar drains toward the clock; a blurred copy under it glows. */
+  .burnout {
+    position: relative;
+    flex: 1;
+    height: 5px;
+    background: var(--bar-track);
+  }
+  .burnout--left {
+    margin-left: 50px;
+  }
+  .burnout--right {
+    margin-right: 50px;
+  }
+  .burnout > i {
+    position: absolute;
+    inset: 0;
+    background: var(--bar);
+    transform: scaleX(var(--p, 1));
+    transform-origin: left;
+    transition: transform 300ms linear;
+  }
+  .burnout > i:first-child {
+    filter: blur(5px);
+  }
+  .burnout--left > i {
+    background: linear-gradient(270deg, #005a82 10%, #0a96aa 70%, #cdfafa 125%);
+    transform-origin: right;
+  }
+  .burnout.is-red {
+    background: var(--bar-urgent-track);
+  }
+  .burnout.is-red > i {
+    background: var(--bar-urgent);
+  }
+  .burnout--left.is-red > i {
+    background: linear-gradient(270deg, #690014 0, #be1e37 50%, #fe7350 85%);
+  }
+  .burnout.is-hidden {
+    visibility: hidden;
+  }
+  /* where an armed dodge fires. */
+  .burnout .tick {
+    position: absolute;
+    z-index: 1;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--red);
+  }
+  .band-queue {
+    margin-top: 2px;
+    text-align: center;
+  }
+  .band.is-final .burnout,
+  .band.is-final .band-clock {
+    animation: final-pulse 1s cubic-bezier(0.46, 0.19, 0.7, 0.98) 10;
+  }
+
+  /* the verdict card: a dark frame with trim. with flags its head row is a
+     strip with a stripe at its left edge, red or amber. */
+  .summary {
+    margin-top: 12px;
+    padding: 14px 16px;
+    display: grid;
+    gap: 12px;
+  }
+  .summary-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .summary-icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--text-secondary);
+  }
+  .summary-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .summary-title,
+  .summary-detail {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .summary-title {
+    letter-spacing: 0.02em;
+  }
+  .summary--red .summary-head,
+  .summary--amber .summary-head {
+    position: relative;
+    margin: -14px -16px 0;
+    min-height: 44px;
+    padding: 5px 16px;
+    gap: 10px;
+  }
+  .summary--red .summary-head {
+    background: var(--banner-red);
+  }
+  .summary--amber .summary-head {
+    background: linear-gradient(90deg, rgba(250, 190, 10, 0.16), rgba(250, 190, 10, 0.04));
+  }
+  .summary--red .summary-head::before,
+  .summary--amber .summary-head::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+  }
+  .summary--red .summary-head::before {
+    background: var(--red-stripe);
+  }
+  .summary--amber .summary-head::before {
+    background: var(--amber);
+  }
+  .summary--red .summary-icon {
+    color: var(--red);
+  }
+  .summary--amber .summary-icon {
+    color: var(--amber);
+  }
+  .summary--clear .summary-icon {
+    color: var(--green);
+  }
+
+  /* the dodge controls: the last-second switch with its label, then the
+     dodge button in the ban button's shape. */
+  .dodge-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .last-second {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .last-second label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  /* while armed, the label counts down: gold before lock-in, red during it. */
+  .dodge-armed {
+    font: 700 12px/16px var(--font-display);
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    color: var(--gold-4);
+  }
+  .dodge-armed.is-final {
+    color: var(--red);
+  }
+  .dodge {
+    position: relative;
+    isolation: isolate;
+    flex: none;
+    width: 128px;
+    height: 36px;
+    padding: 0 0 6px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font: 700 14px/18px var(--font-display);
+    letter-spacing: 0.0325em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .dodge > svg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: visible;
+  }
+  .dodge:hover,
+  .dodge:focus-visible,
+  .dodge[data-stage="confirm"] {
+    --dodge-fill-top: #26262c;
+    --dodge-fill-mid1: #31222a;
+    --dodge-fill-mid2: #42222b;
+    --dodge-fill-bottom: #51222d;
+  }
+  .dodge:active,
+  .dodge[data-stage="leaving"] {
+    color: var(--red-press);
+    --dodge-rim-top: #68232e;
+    --dodge-rim-bottom: #68232e;
+    --dodge-fill-top: #1e2328;
+    --dodge-fill-mid1: #1e2328;
+    --dodge-fill-mid2: #1e2328;
+    --dodge-fill-bottom: #1e2328;
+  }
+  .dodge:disabled {
+    cursor: default;
+  }
+  /* drains under the label for the 3 s the confirm step waits. */
+  .dodge-drain {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 72%;
+    height: 2px;
+    background: var(--bar-urgent);
+    transform-origin: left;
+    animation: drain 3s linear forwards;
+  }
+}
+
+@keyframes final-pulse {
+  0% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
