@@ -5,6 +5,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Pill } from "@/components/ui/pill";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { bridge } from "@/lib/bridge";
+import { platform } from "@/lib/platform";
 import type { ConnectionStatus, UpdateInfo } from "@/types";
 
 const STATUS: Record<
@@ -35,7 +36,7 @@ export function Header({
   // the welcome screen shows only the wordmark and the connection state.
   minimal?: boolean;
 }) {
-  const mac = document.documentElement.classList.contains("vibrancy");
+  const mac = platform === "macos";
   const state = status ? STATUS[status] : null;
   // tauri zooms the window when its drag region is double-clicked, which
   // would blow this small always-on-top panel up over the league client. the

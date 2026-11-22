@@ -1,0 +1,180 @@
+/*
+  the type roles. display roles are uppercase cinzel with wide tracking, for
+  headings, buttons and captions; body roles are source sans 3 in the warm
+  grey, with subpixel smoothing where the platform has it. each role sets its
+  size, line height, weight, tracking, case and default color together.
+*/
+
+@utility type-h3 {
+  font: 700 24px/28px var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-h4 {
+  font: 700 18px/22px var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-h5 {
+  font: 700 14px/18px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-h6 {
+  font: 700 12px/16px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-subhead {
+  font: 700 12px/16px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+@utility type-micro {
+  font: 700 11px/14px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+@utility type-nav {
+  font: 700 14px/18px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-phase {
+  font: italic 400 14px/18px var(--font-body);
+  letter-spacing: 0.025em;
+  text-transform: none;
+  color: var(--text-secondary);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-phase-turn {
+  font: 700 14px/18px var(--font-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-1);
+}
+
+@utility type-queue {
+  font: 700 12px/16px var(--font-display);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+@utility type-button {
+  font: 700 14px/18px var(--font-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold-2);
+}
+
+@utility type-button-text {
+  font: 700 14px/18px var(--font-display);
+  letter-spacing: 0.0325em;
+  text-transform: uppercase;
+  color: var(--gold-3);
+}
+
+@utility type-body-m {
+  font: 400 14px/20px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--text-secondary);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-body {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--text-secondary);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-label {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-role {
+  font: 400 12px/14px var(--font-body);
+  letter-spacing: 0.1em;
+  color: var(--gold-2);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-value {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--gold-1);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-value-strong {
+  font: 900 12px/16px var(--font-body);
+  letter-spacing: 0.1em;
+  color: var(--gold-1);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-button-thin {
+  font: 700 12px/16px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--gold-2);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-link {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.05em;
+  color: var(--gold-2);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-status {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.025em;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-rank {
+  font: 400 11px/13px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--gold-2);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-tag {
+  font: 400 12px/16px var(--font-body);
+  letter-spacing: 0.1em;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-tiny {
+  font: 400 10px/12px var(--font-body);
+  letter-spacing: 0.025em;
+  color: var(--text-secondary);
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+@utility type-count {
+  font: 700 12px/16px var(--font-body);
+  letter-spacing: normal;
+  color: var(--on-accent);
+  -webkit-font-smoothing: subpixel-antialiased;
+}

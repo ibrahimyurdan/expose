@@ -1,0 +1,241 @@
+/*
+  expose's design tokens, in the league client's palette: an opaque navy black
+  window, thin gold gradient frames, pale gold labels that turn cream on
+  hover, teal for wins and what expose reveals, red and amber for flags. the
+  custom properties are the source of truth; @theme turns some of them into
+  tailwind utilities (bg-canvas, text-gold-2, border-gold-6 and so on).
+*/
+:root {
+  /* surfaces and lines */
+  --bg: #010a13;
+  --surface: #1a1c21;
+  --surface-raised: #1e2328;
+  --surface-well: #1e282d;
+  --surface-hover: rgba(240, 230, 209, .1);
+  --surface-selected: rgba(240, 230, 209, .18);
+  --surface-input: rgba(0, 0, 0, .7);
+  --scrim: linear-gradient(rgba(0, 0, 0, .6), rgba(0, 0, 0, .8) 93%);
+  --border: #3c3c41;
+  --border-strong: #785a28;
+  --border-window: #1e282d;
+  --border-subtle: rgba(161, 156, 140, .1);
+  --hairline: #1e2328;
+  --line-gold: #785a28;
+  --line-header: rgba(240, 230, 209, .25);
+  --line-row: #544022;
+  --line-post: #614a1f;
+  --lip-top: #463714;
+  --lip-bottom: #674e21;
+  --lip-shadow: rgba(1, 8, 16, .57);
+
+  /* gold, text and accent */
+  --gold-1: #f0e6d2;
+  --gold-2: #cdbe91;
+  --gold-3: #c8aa6e;
+  --gold-4: #c89b3c;
+  --gold-5: #785a28;
+  --gold-6: #463714;
+  --gold-7: #32281e;
+  --text: var(--gold-1);
+  --text-interactive: var(--gold-2);
+  --accent: var(--gold-3);
+  --amber-soft: var(--gold-4);
+  --accent-press: var(--gold-5);
+  --text-secondary: #a09b8c;
+  --text-muted: #5b5a56;
+  --text-disabled: #5c5b57;
+  --text-stat: #888;
+  --text-click: #e4e1d8;
+  --accent-hover: #f0e6d2;
+  --on-accent: #010a13;
+  --focus: #c8aa6e;
+
+  /* teal, red, amber and green */
+  --blue-1: #cdfafa;
+  --blue-2: #0ac8b9;
+  --blue-3: #0596aa;
+  --blue-4: #005a82;
+  --blue-5: #0a323c;
+  --blue-6: #0a1428;
+  --teal-text: #b2d9db;
+  --ally: #0a96aa;
+  --win: #0acbe6;
+  --status-game: #16cae5;
+  --status-game-bg: #025579;
+  --red: #ff2345;
+  --loss: var(--red);
+  --red-strong: #be1e37;
+  --red-press: #802626;
+  --red-bg: #400a12;
+  --red-tag-bg: #551822;
+  --red-tag-text: #ff93a3;
+  --red-stripe: #ff4545;
+  --amber: #fabe0a;
+  --self: var(--amber);
+  --amber-bg: #1e2328;
+  --green: #00a741;
+  --green-ring: #36d987;
+  --green-bg: #1e825a;
+  --kda-high: #35b138;
+  /* one step brighter than the usual low kda red, for 4.6:1 at 12px. */
+  --kda-low: #d94545;
+  --tag-gold-bg: #463714;
+  --tag-gold-text: #cdbe91;
+
+  /* gradients */
+  --frame-b: linear-gradient(to top, #785a28 0, #463714 50%, #463714 100%);
+  --frame-t: linear-gradient(to bottom, #785a28 0, #463714 50%, #463714 100%);
+  --frame-l: linear-gradient(to right, #785a28 0, #463714 50%, #463714 100%);
+  --frame-r: linear-gradient(to left, #785a28 0, #463714 50%, #463714 100%);
+  --frame-off: linear-gradient(to top, #39393e 0, #1e282d 5px, #1e282d 100%);
+  --edge: linear-gradient(to top, #785b28 0%, #c89c3c 55%, #c8a355 71%, #c8aa6e 100%);
+  --edge-hover: linear-gradient(to top, #c89c3c 0%, #dcc188 50%, #e1c998 71%, #f0e6d8 100%);
+  --edge-down: linear-gradient(to bottom, #463817 0%, #694f27 100%);
+  --edge-down-thin: linear-gradient(to top, #6b5024, #463714);
+  --fill-hover: linear-gradient(to bottom, #1e232a 0%, #1e232a 40%, rgba(118, 97, 51, .8) 140%);
+  --fill-primary: linear-gradient(to bottom, #5a401f 0%, #332717 100%);
+  --fill-primary-hover: linear-gradient(to bottom, #604522 0%, #846745 100%);
+  --fill-primary-down: linear-gradient(to bottom, #362715 0%, #17130e 100%);
+  --sheen: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .15) 92%, rgba(255, 255, 255, 0) 100%);
+  --ring: linear-gradient(to top, #463714 4%, #785a28 23%, #c89b3c 90%, #c8aa6e 100%);
+  --ring-hover: linear-gradient(to top, #c89b3c 0%, #f0e6d2 100%);
+  --ring-down: linear-gradient(to top, #785a28 0%, #463714 100%);
+  --ring-face-hover: linear-gradient(to top, #3c3c41 0%, #1e2328 100%);
+  --input-edge-focus: linear-gradient(to bottom, #785a28, #c8aa6e);
+  --input-fill-focus: linear-gradient(to bottom, rgba(7, 16, 25, .7), rgba(32, 39, 44, .7));
+  --bar-track: rgba(10, 150, 170, .2);
+  --bar: linear-gradient(90deg, #005a82 10%, #0a96aa 70%, #cdfafa 125%);
+  --bar-urgent-track: rgba(190, 30, 55, .2);
+  --bar-urgent: linear-gradient(90deg, #690014 0, #be1e37 50%, #fe7350 85%);
+  --divider: linear-gradient(90deg, rgba(70, 55, 20, .6), transparent);
+  --divider-v: linear-gradient(180deg, transparent, #463714, transparent);
+  --divider-center: linear-gradient(90deg, rgba(60, 60, 65, 0), #3c3c41 50%, rgba(60, 60, 65, 0));
+  --skeleton: linear-gradient(90deg, #1e2328, #2f3b45 50%, #1e2328);
+  --row-glow: linear-gradient(180deg, rgba(200, 170, 111, 0) 25%, rgba(200, 170, 111, .2));
+  --banner-red: linear-gradient(90deg, rgba(141, 34, 34, .5), rgba(118, 16, 13, .15));
+  --band-fade: linear-gradient(180deg, rgba(1, 10, 19, .8) 29.17%, rgba(1, 10, 19, 0));
+
+  /* shadows and motion */
+  --shadow-frame: 0 0 0 1px rgba(1, 10, 19, .48);
+  --shadow-frame-glow: 0 0 10px 1px rgba(0, 0, 0, .5);
+  --shadow-control: 0 0 1px 1px #010a13, inset 0 0 1px 1px #010a13;
+  --shadow-input: 0 0 0 1px rgba(0, 0, 0, .25) inset, 0 0 0 1px rgba(0, 0, 0, .25);
+  --shadow-caret: drop-shadow(0 2px 1px rgba(1, 10, 19, .5));
+  --shadow-text-art: 0 0 5px rgba(1, 10, 19, .8);
+  --halo-dot: 0 0 0 2px #010a13;
+  --glow-round: 0 0 6px -2px rgba(205, 191, 147, .6);
+  --ease-flat: cubic-bezier(0, 0, .33, 1);
+  --ease-popup: 250ms cubic-bezier(.02, .85, .08, .99);
+  --ease-toast: cubic-bezier(.37, 0, .63, 1);
+
+  /* tier tints, two per tier, for the rank crest only. tier text stays gold. */
+  --tier-iron: #675853; --tier-iron-hi: #806f6e;
+  --tier-bronze: #855f4a; --tier-bronze-hi: #a77d65;
+  --tier-silver: #6a878a; --tier-silver-hi: #bdd0d4;
+  --tier-gold: #95712c; --tier-gold-hi: #d3b683;
+  --tier-platinum: #40a09f; --tier-platinum-hi: #aad2cf;
+  --tier-diamond: #2f4a92; --tier-diamond-hi: #c4d7fa;
+  --tier-master: #794b85; --tier-master-hi: #f5cfff;
+  --tier-grandmaster: #ea5a2c; --tier-grandmaster-hi: #ead5d0;
+  --tier-challenger: #66a1e5; --tier-challenger-hi: #cbfdff;
+  --tier-emerald: #1d7a4c; --tier-emerald-hi: #2fbf71;
+
+  /* cinzel has no italic, so italic display text stays upright. */
+  --display-italic: normal;
+}
+
+/* start from an empty scale, so only these exist and a stray default
+   (text-gray-400, rounded-xl) cannot creep back in. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  --font-display: "Expose Display", "Times New Roman", Times, Baskerville, Georgia, serif;
+  --font-body: "Expose Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+  /* the default for text that sets no font. */
+  --font-sans: var(--font-body);
+
+  /* corners are square; these few pieces round. */
+  --radius-xs: 2px;
+  --radius-badge: 3px;
+  --radius-plate: 4px;
+  --radius-pill: 16px;
+
+  /* the v0.2 scale, still used by screens not yet restyled (removed with
+     the legacy names below). */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 16px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 15px;
+  --text-md--line-height: 20px;
+  --text-lg: 18px;
+  --text-lg--line-height: 24px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --radius-sm: 0;
+  --radius-control: 0;
+  --radius-card: 0;
+  --shadow-sm: var(--shadow-frame);
+  --shadow-popover: var(--shadow-frame), var(--shadow-frame-glow);
+}
+
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-well: var(--surface-well);
+  --color-gold-1: var(--gold-1);
+  --color-gold-2: var(--gold-2);
+  --color-gold-3: var(--gold-3);
+  --color-gold-4: var(--gold-4);
+  --color-gold-5: var(--gold-5);
+  --color-gold-6: var(--gold-6);
+  --color-gold-7: var(--gold-7);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
+  --color-teal: var(--blue-2);
+  --color-blue-1: var(--blue-1);
+  --color-win: var(--win);
+  --color-status-game: var(--status-game);
+  --color-red: var(--red);
+  --color-red-strong: var(--red-strong);
+  --color-red-bg: var(--red-bg);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-bg: var(--amber-bg);
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+  --color-kda-high: var(--kda-high);
+  --color-kda-low: var(--kda-low);
+  --color-border-window: var(--border-window);
+  --color-hairline: var(--hairline);
+
+  /* the v0.2 names, kept until every screen is restyled. */
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+
+  --color-tier-iron: var(--tier-iron);
+  --color-tier-bronze: var(--tier-bronze);
+  --color-tier-silver: var(--tier-silver);
+  --color-tier-gold: var(--tier-gold);
+  --color-tier-platinum: var(--tier-platinum);
+  --color-tier-emerald: var(--tier-emerald);
+  --color-tier-diamond: var(--tier-diamond);
+  --color-tier-master: var(--tier-master);
+  --color-tier-grandmaster: var(--tier-grandmaster);
+  --color-tier-challenger: var(--tier-challenger);
+}

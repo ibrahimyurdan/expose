@@ -15,6 +15,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # node strips the types of the small ui tests itself (22.18 and later).
+      - run: npm run test:ui
       - run: npm run build
 
   backend:

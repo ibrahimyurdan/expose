@@ -1,14 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "@/App";
+import { frame, platform } from "@/lib/platform";
 import "@/index.css";
 
-// the macos app renders a native frosted vibrancy behind the window; opt the
-// body into translucency there so the blur shows, and make room for the traffic
-// lights. windows and a plain browser preview (even on a mac) stay opaque.
-if (navigator.userAgent.includes("Macintosh") && "__TAURI_INTERNALS__" in window) {
-  document.documentElement.classList.add("vibrancy");
-}
+// the shell to draw: base.css and the mac: and win: variants read these.
+document.documentElement.dataset.platform = platform;
+document.documentElement.dataset.frame = frame;
 
 // the webview is a browser underneath: in release builds, hide its page menu
 // (back, refresh, save as, print) and the reload, print and find shortcuts, so

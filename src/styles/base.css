@@ -1,0 +1,79 @@
+/*
+  the page under every screen: an opaque navy black window, body text in the
+  quiet warm grey, no text selection or page scrolling (the shell scrolls).
+*/
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--gold-1);
+    font: 400 12px/16px var(--font-body);
+    font-kerning: normal;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* keyboard focus: each control shows its hover look, plus this ring. */
+  :focus-visible {
+    outline: 1px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  img {
+    -webkit-user-drag: none;
+  }
+
+  /* gold scrollbars on both platforms. the standard scrollbar-width and
+     scrollbar-color properties must stay unset: webview2 lets them override
+     these. */
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+    background-color: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background-clip: padding-box;
+    min-height: 32px;
+    background-color: var(--gold-5);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--gold-3);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--gold-6);
+  }
+
+  /* windows 10 draws no edge around a frameless window, so the page draws a
+     1px one on the sides and bottom (the gold line runs along the top). */
+  [data-platform="windows"][data-frame="css"] #root {
+    border: 1px solid var(--border-window);
+    border-top: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* respect the os reduced-motion setting: no pulses, glows, intros or shimmer. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

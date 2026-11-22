@@ -1,180 +1,20 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/fonts.css";
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/type.css";
 
-/*
-  expose design tokens. the app is always dark: neutral graphite surfaces, one
-  blue accent for focus and primary actions, and red, amber and green kept for
-  flags and match results. these custom properties are the source of truth;
-  the @theme blocks below turn them into tailwind utilities such as bg-surface,
-  text-fg-secondary, border-border-strong and text-tier-gold.
-*/
-:root {
-  --bg: #0d0f14;
-  --surface: #14171e;
-  --surface-raised: #1a1e27;
-  --border: #242935;
-  --border-strong: #303747;
+/* mac: and win: apply in the shell of that platform (main.tsx sets
+   data-platform from lib/platform.ts, in the app and in the preview). */
+@custom-variant mac (&:where([data-platform="macos"] *));
+@custom-variant win (&:where([data-platform="windows"] *));
 
-  --text: #e8eaf0;
-  --text-secondary: #a3aab8;
-  /* about 4:1 on the surfaces, so it is for hints, separators and icons, never
-     for text the player has to read. */
-  --text-muted: #6b7385;
-
-  --accent: #5b8cff;
-  --accent-hover: #7aa2ff;
-  /* text and icons on an accent or red fill. white on the accent is only
-     3.2:1; this dark ink is about 6:1. */
-  --on-accent: #0d0f14;
-
-  --red: #f26b6b;
-  --red-bg: #2a1518;
-  --amber: #f2b84b;
-  --amber-bg: #2a2112;
-  --green: #4cc38a;
-  --green-bg: #11261d;
-
-  --tier-iron: #8a8a8a;
-  --tier-bronze: #b07a54;
-  --tier-silver: #a8b2bc;
-  --tier-gold: #d9b45a;
-  --tier-platinum: #4fb3a9;
-  --tier-emerald: #2fbf71;
-  --tier-diamond: #7d9cff;
-  --tier-master: #b46cff;
-  --tier-grandmaster: #ff6b6b;
-  --tier-challenger: #f5d76e;
-}
-
-/* start from an empty palette and scale, so only the tokens above exist and a
-   stray default (text-gray-400, rounded-xl) cannot creep back in. */
-@theme {
-  --color-*: initial;
-  --font-*: initial;
-  --text-*: initial;
-  --radius-*: initial;
-  --shadow-*: initial;
-
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, "SF Pro Text", system-ui,
-    sans-serif;
-
-  /* 11, 12, 13, 15 and 18 px, each with a line height on the 4px grid. */
-  --text-xs: 11px;
-  --text-xs--line-height: 16px;
-  --text-sm: 12px;
-  --text-sm--line-height: 16px;
-  --text-base: 13px;
-  --text-base--line-height: 20px;
-  --text-md: 15px;
-  --text-md--line-height: 20px;
-  --text-lg: 18px;
-  --text-lg--line-height: 24px;
-
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-
-  /* cards 10px, controls 8px, pills use rounded-full. the two small radii are
-     for nested pieces such as a segmented option or a champion icon. */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-control: 8px;
-  --radius-card: 10px;
-
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
-  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(0 0 0 / 0.25);
-}
-
-@theme inline {
-  --color-canvas: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-
-  --color-fg: var(--text);
-  --color-fg-secondary: var(--text-secondary);
-  --color-fg-muted: var(--text-muted);
-
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-on-accent: var(--on-accent);
-
-  --color-red: var(--red);
-  --color-red-bg: var(--red-bg);
-  --color-amber: var(--amber);
-  --color-amber-bg: var(--amber-bg);
-  --color-green: var(--green);
-  --color-green-bg: var(--green-bg);
-
-  --color-tier-iron: var(--tier-iron);
-  --color-tier-bronze: var(--tier-bronze);
-  --color-tier-silver: var(--tier-silver);
-  --color-tier-gold: var(--tier-gold);
-  --color-tier-platinum: var(--tier-platinum);
-  --color-tier-emerald: var(--tier-emerald);
-  --color-tier-diamond: var(--tier-diamond);
-  --color-tier-master: var(--tier-master);
-  --color-tier-grandmaster: var(--tier-grandmaster);
-  --color-tier-challenger: var(--tier-challenger);
-}
-
-/* mac:pl-18 and friends apply only inside the macos app (main.tsx sets the
-   class), for the traffic lights that sit over the top-left of the window. */
-@custom-variant mac (&:where(html.vibrancy *));
-
-@layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-  }
-
-  body {
-    margin: 0;
-    background-color: var(--bg);
-    color: var(--text);
-    font-family: var(--font-sans);
-    font-size: var(--text-base);
-    line-height: var(--text-base--line-height);
-    color-scheme: dark;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* the window frames one panel: the shell scrolls, the body never does. */
-    overflow: hidden;
-    -webkit-user-select: none;
-    user-select: none;
-    cursor: default;
-  }
-
-  /* one focus treatment for everything that can take keyboard focus. */
-  :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  /* thin scrollbars in the surface colors (windows; macos keeps its overlay
-     bars). */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
-  }
-
-  img {
-    -webkit-user-drag: none;
-  }
-}
-
-/* a placeholder block for data that is still loading. its shimmer is the only
-   gradient in the app. size it with h-* and w-* utilities. */
+/* a placeholder block for data that is still loading. size it with h-* and
+   w-* utilities. */
 @utility skeleton {
   border-radius: var(--radius-xs);
-  background-image: linear-gradient(
-    90deg,
-    var(--surface-raised) 25%,
-    var(--border) 37%,
-    var(--surface-raised) 63%
-  );
+  background-image: var(--skeleton);
   background-size: 400% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
 }
@@ -197,22 +37,4 @@
   to {
     transform: scaleX(0);
   }
-}
-
-/* respect the os reduced-motion setting for pulses, shimmers and drains. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* on macos the window has a native frosted vibrancy behind it, and a
-   translucent body lets the blur show through. main.tsx sets .vibrancy only in
-   the macos app, so windows and the browser preview stay opaque. */
-html.vibrancy body {
-  background: rgb(13 15 20 / 0.82);
 }
