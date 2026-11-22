@@ -15,6 +15,7 @@ mod tls;
 #[cfg(target_os = "windows")]
 mod tray;
 mod update;
+mod window;
 
 use std::sync::atomic::Ordering;
 
@@ -76,6 +77,8 @@ fn main() {
             commands::set_dodge_lead,
             commands::set_welcomed,
             commands::open_logs_folder,
+            commands::hide_main_window,
+            commands::frontend_ready,
         ])
         .on_window_event(|window, event| {
             // closing the window keeps expose running and just hides it; it is
@@ -83,8 +86,7 @@ fn main() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
-                    remember_window(window.app_handle());
-                    let _ = window.hide();
+                    window::hide_main(window.app_handle());
                 }
             }
         })
@@ -132,29 +134,20 @@ fn main() {
                 }
             }
 
+            window::build_main_window(app)?;
             // windows lives in the notification area, kept off the taskbar (see
-            // reveal_main_window).
+            // reveal_main_window); macos lives in the dock.
             #[cfg(target_os = "windows")]
-            {
-                if let Some(window) = handle.get_webview_window("main") {
-                    // a dark title bar to match the panel even in light mode.
-                    let _ = window.set_theme(Some(tauri::Theme::Dark));
-                    // with no taskbar button a minimized window has nowhere to
-                    // go, so the title bar only offers close (which hides it).
-                    let _ = window.set_minimizable(false);
-                    let _ = window.set_maximizable(false);
-                }
-                tray::build(&handle)?;
-                // new tray icons often land in the hidden overflow area, so a
-                // normal launch opens the window to show expose is running.
-                if !std::env::args().any(|arg| arg == AUTOSTART_FLAG) {
-                    show_main_window(&handle);
-                }
-            }
-
-            // macos: an opaque window, a dock icon, and open on launch.
-            #[cfg(target_os = "macos")]
-            show_main_window(&handle);
+            tray::build(&handle)?;
+            // a launch shows the window once its first screen has painted (see
+            // frontend_ready), or after a short wait if the ui never says so.
+            // new tray icons often land in the hidden overflow area, so on
+            // windows a normal launch opening the window shows expose runs.
+            let fallback = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(window::FIRST_SHOW_FALLBACK).await;
+                window::first_show(&fallback, "after the fallback wait");
+            });
 
             // background work: champion data, an update check, the supervisor.
             tauri::async_runtime::spawn(ddragon::load(handle.clone()));

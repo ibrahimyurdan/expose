@@ -165,6 +165,8 @@ export function createPreviewBackend(): Bridge {
       return done();
     },
     openLogsFolder: () => note("open the logs folder"),
+    // there is no window to show in a browser.
+    ready: () => done(),
 
     onStatus: (handler) => subscribe(statusHandlers, handler),
     onLobby: (handler) => subscribe(lobbyHandlers, handler),

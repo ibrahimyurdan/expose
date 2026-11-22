@@ -10,7 +10,7 @@ import { useLastLobby, useLobby } from "@/hooks/useLobby";
 import { useSettings } from "@/hooks/useSettings";
 import { useStatus } from "@/hooks/useStatus";
 import { useUpdate } from "@/hooks/useUpdate";
-import { previewScreen } from "@/lib/bridge";
+import { bridge, previewScreen } from "@/lib/bridge";
 import { Idle } from "@/screens/Idle";
 import { Lobby } from "@/screens/Lobby";
 import { Settings } from "@/screens/Settings";
@@ -75,6 +75,25 @@ function Shell() {
   // page must not open the lobby halfway down.
   useEffect(() => {
     main.current?.scrollTo({ top: 0 });
+  }, [screen]);
+
+  // once the first real screen is on the page with its fonts, tell the
+  // backend, which shows the window for this launch: never empty, never with
+  // the fonts swapping in. a timer rather than an animation frame, because
+  // the window is still hidden and hidden pages get no frames.
+  const readySent = useRef(false);
+  useEffect(() => {
+    if (screen === "loading" || readySent.current) {
+      return;
+    }
+    readySent.current = true;
+    void document.fonts.ready.then(() =>
+      setTimeout(() => {
+        bridge.ready().catch(() => {
+          // the backend shows the window after a short wait anyway.
+        });
+      }, 0),
+    );
   }, [screen]);
 
   let content: ReactNode = null;

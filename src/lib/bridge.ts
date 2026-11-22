@@ -46,6 +46,8 @@ export interface Bridge {
   setDodgeLead: (ms: number) => Promise<void>;
   setWelcomed: () => Promise<void>;
   openLogsFolder: () => Promise<void>;
+  // the first screen has painted: the backend shows the window for a launch.
+  ready: () => Promise<void>;
 
   onStatus: (handler: (status: ConnectionStatus) => void) => Promise<UnlistenFn>;
   // null when champ select ends.
@@ -76,6 +78,7 @@ const tauriBridge: Bridge = {
   setDodgeLead: (ms) => invoke<void>("set_dodge_lead", { ms: Math.round(ms) }),
   setWelcomed: () => invoke<void>("set_welcomed"),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
+  ready: () => invoke<void>("frontend_ready"),
 
   onStatus: (handler) => listen<ConnectionStatus>(EVENT_STATUS, (event) => handler(event.payload)),
   onLobby: (handler) => listen<LobbyView | null>(EVENT_LOBBY, (event) => handler(event.payload)),
@@ -135,6 +138,7 @@ function previewBridge(): Bridge {
     setDodgeLead: forward("setDodgeLead"),
     setWelcomed: forward("setWelcomed"),
     openLogsFolder: forward("openLogsFolder"),
+    ready: forward("ready"),
     onStatus: forward("onStatus"),
     onLobby: forward("onLobby"),
     onUpdate: forward("onUpdate"),

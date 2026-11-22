@@ -17,20 +17,20 @@
       {
         "label": "main",
         "title": "Expose",
+        "create": false,
         "width": 460,
         "height": 680,
         "minWidth": 420,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
+        "maximizable": false,
         "alwaysOnTop": true,
         "visible": false,
-        "decorations": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
         "skipTaskbar": false,
         "transparent": false,
-        "backgroundColor": "#0d0f14"
+        "theme": "Dark",
+        "backgroundColor": "#010a13"
       }
     ],
     "security": {

@@ -1059,6 +1059,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
+ "windows-version",
 ]
 
 [[package]]

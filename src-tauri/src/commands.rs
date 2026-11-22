@@ -259,3 +259,16 @@ mod tests {
         );
     }
 }
+
+// hides the window and saves its size and position: the title bar's close
+// button, and on windows its minimize button too.
+#[tauri::command]
+pub fn hide_main_window(app: AppHandle) {
+    crate::window::hide_main(&app);
+}
+
+// the ui has painted its first screen: show the window, if this launch should.
+#[tauri::command]
+pub fn frontend_ready(app: AppHandle) {
+    crate::window::first_show(&app, "the ui painted its first screen");
+}

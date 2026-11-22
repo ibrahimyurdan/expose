@@ -37,6 +37,10 @@ tokio = { version = "1.47", features = ["macros", "net", "rt", "rt-multi-thread"
 tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "logging", "tls12"] }
 tokio-tungstenite = "0.29.0"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# the os build number tells windows 11 (its own window frame) from windows 10.
+windows-version = "0.1"
+
 # small and fast release builds: one codegen unit with full lto, tuned for
 # size, without symbols. a panic aborts after the panic hook has logged it
 # (see log_panics in main.rs).
