@@ -10,6 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { artUrl } from "@/lib/art";
 import { platform } from "@/lib/platform";
 
 import type {
@@ -58,6 +59,9 @@ export interface Bridge {
   minimizeWindow: () => Promise<void>;
   // the windows corner grip.
   startResize: () => Promise<void>;
+  // the address of one of league's own images (see lib/art.ts), or null
+  // where there is none to load, as in the browser preview.
+  leagueArt: (file: string) => string | null;
 
   onStatus: (handler: (status: ConnectionStatus) => void) => Promise<UnlistenFn>;
   // null when champ select ends.
@@ -93,6 +97,7 @@ const tauriBridge: Bridge = {
   minimizeWindow: () =>
     platform === "macos" ? getCurrentWindow().minimize() : invoke<void>("hide_main_window"),
   startResize: () => getCurrentWindow().startResizeDragging("SouthEast"),
+  leagueArt: (file) => artUrl(file, platform),
 
   onStatus: (handler) => listen<ConnectionStatus>(EVENT_STATUS, (event) => handler(event.payload)),
   onLobby: (handler) => listen<LobbyView | null>(EVENT_LOBBY, (event) => handler(event.payload)),
@@ -164,6 +169,13 @@ function previewBridge(): Bridge {
     hideWindow: forward("hideWindow"),
     minimizeWindow: forward("minimizeWindow"),
     startResize: forward("startResize"),
+    // answered here, since it is synchronous: no rust side to read league's
+    // archive, so the drawings show, unless ?art=<address> points at a local
+    // folder of the images to check the real look (never one in the repo).
+    leagueArt: (file) => {
+      const art = new URLSearchParams(window.location.search).get("art");
+      return art ? `${art.replace(/\/$/, "")}/${file}` : null;
+    },
     onStatus: forward("onStatus"),
     onLobby: forward("onLobby"),
     onUpdate: forward("onUpdate"),

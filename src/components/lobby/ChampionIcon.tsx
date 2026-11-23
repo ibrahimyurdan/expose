@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 
+import { LeagueArt } from "@/components/art/LeagueArt";
 import { PositionGlyph } from "@/components/art/PositionGlyph";
+import { roleFile } from "@/lib/art";
 import { cn } from "@/lib/utils";
 import type { ChampionData, Position } from "@/types";
 
@@ -65,7 +67,13 @@ export function ChampionIcon({
         <span className="portrait-face">{picture}</span>
       ) : (
         <span className="portrait-empty">
-          {position ? <PositionGlyph position={position} /> : null}
+          {position ? (
+            <LeagueArt
+              file={roleFile(position)}
+              className="portrait-role"
+              fallback={<PositionGlyph position={position} className="portrait-role" />}
+            />
+          ) : null}
         </span>
       )}
       <Ring tone={ring} />

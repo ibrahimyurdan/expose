@@ -1,10 +1,12 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 
+import { LeagueArt } from "@/components/art/LeagueArt";
 import { PositionGlyph } from "@/components/art/PositionGlyph";
 import { ChampionIcon, championName } from "@/components/lobby/ChampionIcon";
 import { Button } from "@/components/ui/button";
 import { Raised } from "@/components/ui/frame";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
+import { roleFile } from "@/lib/art";
 import { bridge } from "@/lib/bridge";
 import {
   capitalize,
@@ -146,7 +148,11 @@ function Roles({ roles, slot }: { roles: RoleShare[]; slot: Position | null }) {
                 <span className="role-track" aria-hidden>
                   <span className="role-bar" style={{ "--share": value } as CSSProperties} />
                 </span>
-                <PositionGlyph position={position} />
+                <LeagueArt
+                  file={roleFile(position)}
+                  className="role-icon"
+                  fallback={<PositionGlyph position={position} className="role-icon" />}
+                />
                 <span className="role-pct type-tiny">{formatPercent(value)}</span>
                 <span className="sr-only">
                   {positionLabel(position)}

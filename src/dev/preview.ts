@@ -7,6 +7,7 @@
 //                                                 the lobby state (ranked); live
 //                                                 plays a lobby filling in: names
 //                                                 first, then stats arriving
+//   ?art=<address>                                league's images from a local folder
 //   ?update=0|failed                              up to date, or the update
 //                                                 check could not reach github
 //   ?notice=1                                     raise a sample error toast
@@ -170,6 +171,8 @@ export function createPreviewBackend(): Bridge {
     hideWindow: () => note("hide the window"),
     minimizeWindow: () => note("minimize the window"),
     startResize: () => note("resize from the corner"),
+    // the preview bridge answers this one itself (see lib/bridge.ts).
+    leagueArt: () => null,
 
     onStatus: (handler) => subscribe(statusHandlers, handler),
     onLobby: (handler) => subscribe(lobbyHandlers, handler),
