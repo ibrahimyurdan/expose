@@ -2,19 +2,22 @@ import { useId, type CSSProperties, type ReactNode } from "react";
 
 import { LeagueArt } from "@/components/art/LeagueArt";
 import { PositionGlyph } from "@/components/art/PositionGlyph";
+import { RankCrest } from "@/components/art/RankCrest";
 import { ChampionIcon, championName } from "@/components/lobby/ChampionIcon";
 import { Button } from "@/components/ui/button";
 import { Raised } from "@/components/ui/frame";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
-import { roleFile } from "@/lib/art";
+import { crestFile, emblemFile, roleFile } from "@/lib/art";
 import { bridge } from "@/lib/bridge";
 import {
   capitalize,
   formatMinutes,
   formatPercent,
   formatPoints,
+  isApexTier,
   plural,
   positionLabel,
+  tierName,
   timeAgo,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -24,9 +27,9 @@ import type { ChampionData, GameView, PlayerView, Position, RoleShare, StatsView
 const POSITIONS: readonly Position[] = ["top", "jungle", "middle", "bottom", "utility"];
 
 // the open part of a player row: a raised card pointing up at the portrait,
-// with the account level, the ranked season and experience on the slot's
-// champion, the roles they play, their last ten games and a link to their
-// profile on the scout site. it is taller than the room under the pinned
+// with the solo/duo rank under the tier's emblem, the account level and
+// experience on the slot's champion, the roles they play, their last ten
+// games and a link to their profile on the scout site. it is taller than the room under the pinned
 // band, so opening a row scrolls it up under the band (see PlayerRow).
 export function PlayerDetail({
   id,
@@ -43,8 +46,6 @@ export function PlayerDetail({
   scoutLabel: string;
 }) {
   const champion = championName(champions, player.championId);
-  const rank = stats.rank;
-  const ranked = rank ? rank.wins + rank.losses : 0;
 
   return (
     <Raised id={id} className="details fade-in">
@@ -53,28 +54,25 @@ export function PlayerDetail({
         <path d="M1 11 11 1 21 11" fill="none" stroke="#785a28" strokeWidth="2" />
       </svg>
 
+      <RankHead stats={stats} />
+
       <dl className="details-section facts">
         <Fact label="Level">{stats.level ?? "Unknown"}</Fact>
         <span className="rule--v" aria-hidden />
-        <Fact label="Ranked this season">
-          {!rank ? (
-            stats.unranked ? (
-              "Unranked"
-            ) : (
-              "Unknown"
-            )
-          ) : ranked > 0 ? (
-            <>
-              {rank.wins}W {rank.losses}L
-              <span className="text-text-secondary"> · {formatPercent(rank.wins / ranked)}</span>
-            </>
-          ) : (
-            "No games"
-          )}
+        <Fact label={champion ? `On ${champion}` : "Champion"}>
+          {player.championId <= 0
+            ? "No pick yet"
+            : stats.championGames !== null
+              ? plural(stats.championGames, "game")
+              : "Unknown"}
         </Fact>
         <span className="rule--v" aria-hidden />
-        <Fact label={champion ? `On ${champion}` : "Champion"}>
-          {player.championId > 0 ? <ChampionExperience stats={stats} /> : "No pick yet"}
+        <Fact label="Mastery">
+          {player.championId <= 0
+            ? "–"
+            : stats.championPoints !== null
+              ? `${formatPoints(stats.championPoints)} pts`
+              : "Unknown"}
         </Fact>
       </dl>
 
@@ -105,6 +103,57 @@ export function PlayerDetail({
   );
 }
 
+// the solo/duo rank: the tier's full emblem (our crest until it loads), the
+// rank and lp, then the season's record. unranked shows the unranked crest; a
+// rank that could not be loaded says so.
+function RankHead({ stats }: { stats: StatsView }) {
+  const { rank } = stats;
+  let art: ReactNode = null;
+  let title: ReactNode;
+  let record = "Ranked solo/duo";
+  if (rank) {
+    const tier = rank.tier.toUpperCase();
+    const division = isApexTier(tier) ? "" : rank.division;
+    const games = rank.wins + rank.losses;
+    art = (
+      <LeagueArt
+        file={emblemFile(tier)}
+        className="rank-emblem-art"
+        fallback={<RankCrest tier={tier} className="rank-emblem-crest" />}
+      />
+    );
+    title = (
+      <>
+        {tierName(tier)}
+        {division ? ` ${division}` : null}
+        <span className="lp"> · {rank.lp} LP</span>
+      </>
+    );
+    record +=
+      games > 0
+        ? ` · ${rank.wins}W ${rank.losses}L · ${formatPercent(rank.wins / games)}`
+        : " · No games";
+  } else if (stats.unranked) {
+    art = <LeagueArt file={crestFile("unranked")} className="rank-emblem-crest" fallback={null} />;
+    title = "Unranked";
+  } else {
+    title = "Rank unknown";
+  }
+  return (
+    <div className="details-section rank-head">
+      {art ? (
+        <span aria-hidden className="rank-emblem">
+          {art}
+        </span>
+      ) : null}
+      <div className="rank-head-text">
+        <p className="rank-head-title type-h5">{title}</p>
+        <p className="rank-head-record type-body tabular-nums">{record}</p>
+      </div>
+    </div>
+  );
+}
+
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -112,18 +161,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
       <dd className="type-value tabular-nums">{children}</dd>
     </div>
   );
-}
-
-// recent games and mastery on the slot's champion, each only when known.
-function ChampionExperience({ stats }: { stats: StatsView }) {
-  const parts: string[] = [];
-  if (stats.championGames !== null) {
-    parts.push(plural(stats.championGames, "game"));
-  }
-  if (stats.championPoints !== null) {
-    parts.push(`${formatPoints(stats.championPoints)} pts`);
-  }
-  return <>{parts.length > 0 ? parts.join(" · ") : "Unknown"}</>;
 }
 
 // how their recent games split across the five roles, one bar each. the role

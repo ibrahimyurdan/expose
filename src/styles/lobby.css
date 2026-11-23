@@ -654,6 +654,54 @@
     width: 22px;
     height: 11px;
   }
+  /* the rank at the top of the details: the tier's emblem, the rank and lp,
+     the season's record. */
+  .rank-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .rank-emblem {
+    position: relative;
+    flex: none;
+    width: 64px;
+    height: 48px;
+    overflow: hidden;
+  }
+  /* each emblem sits in a 1280x720 canvas, its visible part within about 330
+     by 240 around (640, 340) for every tier; scaled so that region fills the
+     box. */
+  .rank-emblem-art {
+    position: absolute;
+    left: -92px;
+    top: -42px;
+    width: 248px;
+    height: 140px;
+    max-width: none;
+  }
+  .rank-emblem-crest {
+    position: absolute;
+    left: 16px;
+    top: 8px;
+    width: 32px;
+    height: 32px;
+  }
+  .rank-head-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .rank-head-title,
+  .rank-head-record {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rank-head-title .lp {
+    color: var(--text-secondary);
+  }
+  .rank-head-record {
+    margin-top: 2px;
+  }
   .details-section + .details-section {
     margin-top: 10px;
     padding-top: 10px;
