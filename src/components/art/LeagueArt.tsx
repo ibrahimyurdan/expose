@@ -2,10 +2,10 @@ import { useState, type ReactNode } from "react";
 
 import { bridge } from "@/lib/bridge";
 
-// the images that have loaded, or failed, this session. a second row with the
-// same crest shows the image at once instead of the drawing first.
+// the images that have loaded this session: a second row with the same crest
+// shows the image at once instead of the drawing first. a failure is kept by
+// the instance alone, so a row in the next lobby tries again.
 const loaded = new Set<string>();
-const broken = new Set<string>();
 
 // one of league's own images (see lib/art.ts), with expose's drawing in its
 // place until the image has loaded, and for good when it can't: no league
@@ -20,11 +20,12 @@ export function LeagueArt({
   className?: string;
   fallback: ReactNode;
 }) {
-  // the address this one has seen load or fail: setting it redraws this
-  // instance, which then reads the shared sets above.
+  // the address this one has seen load (which redraws it, to read the set
+  // above) and the one it has seen fail.
   const [settled, setSettled] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const url = file ? bridge.leagueArt(file) : null;
-  if (!url || broken.has(url)) {
+  if (!url || failed === url) {
     return <>{fallback}</>;
   }
   const shown = loaded.has(url);
@@ -45,12 +46,7 @@ export function LeagueArt({
             setSettled(url);
           }
         }}
-        onError={() => {
-          broken.add(url);
-          if (settled !== url) {
-            setSettled(url);
-          }
-        }}
+        onError={() => setFailed(url)}
       />
     </>
   );

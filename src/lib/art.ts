@@ -35,9 +35,9 @@ export function emblemFile(tier: string): string | null {
   return TIERS.has(name) ? `images/ranked-emblem/emblem-${name}.png` : null;
 }
 
-// the client's role icon: gold, or the light (silver) one.
-export function roleFile(position: Position, light = false): string {
-  return `svg/position-${position}${light ? "-light" : ""}.svg`;
+// the client's gold role icon.
+export function roleFile(position: Position): string {
+  return `svg/position-${position}.svg`;
 }
 
 // custom protocols load from <scheme>://localhost on macos and from

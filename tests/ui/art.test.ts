@@ -20,7 +20,7 @@ test("an unknown tier has no file, so the drawing shows", () => {
 test("emblems and role icons use the client's file names", () => {
   assert.equal(emblemFile("Grandmaster"), "images/ranked-emblem/emblem-grandmaster.png");
   assert.equal(roleFile("utility"), "svg/position-utility.svg");
-  assert.equal(roleFile("middle", true), "svg/position-middle-light.svg");
+  assert.equal(roleFile("middle"), "svg/position-middle.svg");
 });
 
 test("the art url follows the platform's custom scheme form", () => {

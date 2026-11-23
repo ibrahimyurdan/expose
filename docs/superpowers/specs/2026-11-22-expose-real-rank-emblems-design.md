@@ -11,7 +11,7 @@ the owner wants expose to show league's real icons, the way op.gg does: the rank
 - each player row's rank (line one, 14px) shows the client's small rank crest for the tier, the one the client draws for small sizes.
 - a player's details show the tier's full emblem, larger, with the ranked season.
 - an unranked player shows the client's unranked crest beside "unranked".
-- the role icons on an empty portrait (no pick yet) and in the details' role bars are the client's position icons; the slot's own role is the light variant.
+- the role icons on an empty portrait (no pick yet) and in the details' role bars are the client's gold position icons; the slot's own role is lit at full strength and the others dimmed (my call during the build: the client's silver "-light" set read as out of place among the gold, so it isn't served).
 
 ## non-goals
 
@@ -37,7 +37,7 @@ the owner wants expose to show league's real icons, the way op.gg does: the rank
 - the files, from the client's static assets plugin (`rcp-fe-lol-static-assets`), names checked against its file tree:
   - small crests: `images/ranked-mini-crests/<tier>.svg`, all ten tiers plus `unranked.svg` (emerald has only the svg, so svg throughout).
   - full emblems: `images/ranked-emblem/emblem-<tier>.png`.
-  - role icons: `svg/position-<top|jungle|middle|bottom|utility>.svg`, with `-light` variants.
+  - role icons: `svg/position-<top|jungle|middle|bottom|utility>.svg` (the gold set).
 - the source, corrected after a live check on 2026-11-22: the client's local server does not serve its interface files (every `/fe/...` path is a 404, "invalid uri format"), so expose reads them from league's own archive on disk instead: `<league folder>/Plugins/rcp-fe-lol-static-assets/assets.wad`, the folder that holds league's lockfile. the archive is riot's wad format, version 3, with entries keyed by the xxh64 hash of the lowercased path `plugins/rcp-fe-lol-static-assets/global/default/<file>` and stored raw or zstd-compressed. all 31 files were found and unpacked on the owner's mac. it is still the player's own league that supplies the art, and it now works with league closed as long as it is installed.
 - the path: the page asks a custom protocol registered in rust; rust checks the path against the exact list of files above, reads it from the archive, and answers with the bytes and their content type. get only. anything else, no league install, or a file the archive lacks is a 404, and the page shows the fallback drawing.
 - a small in-memory cache per app run, keyed by path, so each file is fetched once.

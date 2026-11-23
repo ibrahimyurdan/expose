@@ -5,9 +5,12 @@
 // league's own archive on disk. the client's local server does not serve
 // these files, and the archive works with league closed too.
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+
+use parking_lot::Mutex;
 
 use tauri::http::{header, Method, Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, UriSchemeContext, UriSchemeResponder, Wry};
@@ -43,8 +46,7 @@ pub struct Art {
 }
 
 // the request path must name one allowed file exactly: a small crest for a
-// tier or unranked, a full emblem for a tier, or a role icon or its light
-// variant. anything else, or a method other than get, is refused. nothing is
+// tier or unranked, a full emblem for a tier, or a role icon. anything else, or a method other than get, is refused. nothing is
 // decoded, so an encoded or relative path never matches.
 pub fn route(get: bool, path: &str) -> Option<Art> {
     if !get {
@@ -63,7 +65,7 @@ pub fn route(get: bool, path: &str) -> Option<Art> {
     let allowed = match (crest, emblem, role) {
         (Some(name), _, _) => name == "unranked" || TIERS.contains(&name),
         (_, Some(tier), _) => TIERS.contains(&tier),
-        (_, _, Some(name)) => POSITIONS.contains(&name.strip_suffix("-light").unwrap_or(name)),
+        (_, _, Some(name)) => POSITIONS.contains(&name),
         _ => false,
     };
     if !allowed {
@@ -100,27 +102,48 @@ async fn answer(app: &AppHandle, art: Option<Art>) -> Response<Vec<u8>> {
     let Some(art) = art else {
         return not_found();
     };
-    let state = app.state::<AppState>();
-    let cached = state.art.lock().get(&art.archive_path).cloned();
-    let bytes = match cached {
-        Some(known) => known,
-        None => {
-            let path = art.archive_path.clone();
-            let read = tauri::async_runtime::spawn_blocking(move || read_art(&path))
-                .await
-                .ok()
-                .flatten();
-            state
-                .art
-                .lock()
-                .insert(art.archive_path.clone(), read.clone());
-            read
-        }
-    };
+    let handle = app.clone();
+    let path = art.archive_path.clone();
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        let state = handle.state::<AppState>();
+        cached(&state.art, &path, || read_art(&path))
+    })
+    .await
+    .ok()
+    .flatten();
     match bytes {
         Some(bytes) => found(&art, bytes),
         None => not_found(),
     }
+}
+
+// what one read of the archive found.
+pub enum Read {
+    Found(Vec<u8>),
+    // the archive was read and has no such file.
+    Missing,
+    // no league install, or the archive couldn't be read.
+    Failed,
+}
+
+// the cached answer for a path, or a fresh read. a file the archive has, or
+// lacks, is kept for the app's run; a failed read is not, so the next request
+// tries again (a locked or half-written archive, or league installed later).
+pub fn cached(
+    cache: &Mutex<HashMap<String, Option<Vec<u8>>>>,
+    path: &str,
+    read: impl FnOnce() -> Read,
+) -> Option<Vec<u8>> {
+    if let Some(known) = cache.lock().get(path).cloned() {
+        return known;
+    }
+    let bytes = match read() {
+        Read::Found(bytes) => Some(bytes),
+        Read::Missing => None,
+        Read::Failed => return None,
+    };
+    cache.lock().insert(path.to_string(), bytes.clone());
+    bytes
 }
 
 // the interface plugin's archive in league's folder.
@@ -131,29 +154,46 @@ fn archive_in(folder: PathBuf) -> PathBuf {
         .join("assets.wad")
 }
 
-// reads one allowed file from league's archive. a miss is logged; the cache
-// keeps it, so each file is tried once per run.
-fn read_art(archive_path: &str) -> Option<Vec<u8>> {
+// paths whose failure is already in the log, so a retried read doesn't
+// repeat it.
+static WARNED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+fn warn_once(path: &str, message: std::fmt::Arguments) {
+    let mut warned = WARNED.lock();
+    if !warned.iter().any(|known| known == path) {
+        warned.push(path.to_string());
+        log::warn!("{message}");
+    }
+}
+
+// reads one allowed file from league's archive, logging a miss or a failure.
+fn read_art(archive_path: &str) -> Read {
     let Some(archive) = crate::lcu::auth::league_folders()
         .into_iter()
         .map(archive_in)
         .find(|path| path.is_file())
     else {
-        log::warn!("art: no league archive found for {archive_path}");
-        return None;
+        warn_once(
+            archive_path,
+            format_args!("art: no league archive found for {archive_path}"),
+        );
+        return Read::Failed;
     };
     let read = File::open(&archive)
         .map_err(crate::error::Error::from)
         .and_then(|file| crate::wad::read_file(&mut BufReader::new(file), archive_path));
     match read {
-        Ok(Some(bytes)) => Some(bytes),
+        Ok(Some(bytes)) => Read::Found(bytes),
         Ok(None) => {
             log::warn!("art: {archive_path} is not in league's archive");
-            None
+            Read::Missing
         }
         Err(error) => {
-            log::warn!("art: could not read {archive_path}: {error}");
-            None
+            warn_once(
+                archive_path,
+                format_args!("art: could not read {archive_path}: {error}"),
+            );
+            Read::Failed
         }
     }
 }
@@ -188,7 +228,7 @@ mod tests {
         let emblem = route(true, "/images/ranked-emblem/emblem-diamond.png").expect("an emblem");
         assert_eq!(emblem.content_type, "image/png");
         assert!(route(true, "/images/ranked-mini-crests/unranked.svg").is_some());
-        assert!(route(true, "/svg/position-utility-light.svg").is_some());
+        assert!(route(true, "/svg/position-utility.svg").is_some());
     }
 
     #[test]
@@ -206,9 +246,37 @@ mod tests {
             "/images/ranked-emblem/emblem-wood.png",
             "/svg/position-fill.svg",
             "/svg/position-top-red.svg",
+            // the silver role icons are not used, so not served.
+            "/svg/position-utility-light.svg",
         ] {
             assert!(route(true, path).is_none(), "{path}");
         }
+    }
+
+    #[test]
+    fn a_found_or_missing_file_is_read_once() {
+        let cache = Mutex::new(HashMap::new());
+        assert_eq!(
+            cached(&cache, "a.svg", || Read::Found(b"x".to_vec())),
+            Some(b"x".to_vec())
+        );
+        assert_eq!(
+            cached(&cache, "a.svg", || panic!("read twice")),
+            Some(b"x".to_vec())
+        );
+        assert_eq!(cached(&cache, "b.svg", || Read::Missing), None);
+        assert_eq!(cached(&cache, "b.svg", || panic!("read twice")), None);
+    }
+
+    #[test]
+    fn a_failed_read_is_tried_again() {
+        // a locked or half-written archive, or league installed later.
+        let cache = Mutex::new(HashMap::new());
+        assert_eq!(cached(&cache, "a.svg", || Read::Failed), None);
+        assert_eq!(
+            cached(&cache, "a.svg", || Read::Found(b"<svg/>".to_vec())),
+            Some(b"<svg/>".to_vec())
+        );
     }
 
     #[test]
@@ -233,12 +301,13 @@ mod tests {
         );
         for position in POSITIONS {
             files.push(format!("/svg/position-{position}.svg"));
-            files.push(format!("/svg/position-{position}-light.svg"));
         }
-        assert_eq!(files.len(), 31);
+        assert_eq!(files.len(), 26);
         for file in files {
             let art = route(true, &file).expect("an allowed file");
-            let bytes = read_art(&art.archive_path).expect("in league's archive");
+            let Read::Found(bytes) = read_art(&art.archive_path) else {
+                panic!("{file} is not in league's archive");
+            };
             if art.content_type == "image/png" {
                 assert!(bytes.starts_with(b"\x89PNG"), "{file}");
             } else {

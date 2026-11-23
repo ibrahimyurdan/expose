@@ -541,7 +541,10 @@ export function lobbyFixture(variant: LobbyVariant, options: LobbyOptions = {}):
             rank: { ...LONG_JUNGLER.rank },
             flags: LONG_JUNGLER.flags.map((flag) => ({ ...flag })),
           }
-        : base;
+        : variant === "aram" && base.cellId === 4
+          ? // an aram-only support with no solo/duo rank, to check "unranked".
+            { ...base, rank: null }
+          : base;
     const resolved = player.isSelf || (variant !== "resolving" && variant !== "hidden");
     const kind = matchKind(player, variant);
     const loading = resolved && pending.includes(player.key);
