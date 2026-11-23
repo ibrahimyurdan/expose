@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="182 182 660 660">
+  <!-- the windows tray icon: the molded eye alone on a clear background,
+       filling the square so it reads at 16 px. its 32 px render is
+       tray.png (rsvg-convert -w 32 -h 32 tray.svg), which tray.rs builds
+       into the app. -->
+  <defs>
+    <radialGradient id="socket" cx="50%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#0c2836"/>
+      <stop offset="1" stop-color="#010a13"/>
+    </radialGradient>
+    <radialGradient id="iris" cx="50%" cy="42%" r="60%">
+      <stop offset="0" stop-color="#eafffd"/>
+      <stop offset=".35" stop-color="#4fe3d4"/>
+      <stop offset=".8" stop-color="#0a8f9a"/>
+      <stop offset="1" stop-color="#05505a"/>
+    </radialGradient>
+  </defs>
+  <g stroke="#241a0a" stroke-width="10" stroke-linejoin="miter">
+    <path d="M196 512 360 382 512 382 512 438 400 438 284 512Z" fill="#f4e2b8"/>
+    <path d="M828 512 664 382 512 382 512 438 624 438 740 512Z" fill="#dcbf80"/>
+    <path d="M196 512 360 642 512 642 512 586 400 586 284 512Z" fill="#b08840"/>
+    <path d="M828 512 664 642 512 642 512 586 624 586 740 512Z" fill="#8a6528"/>
+    <path d="M284 512 400 438 624 438 740 512 624 586 400 586Z" fill="url(#socket)"/>
+    <path d="M512 410 440 440 410 512 512 512Z" fill="#f0d79c"/>
+    <path d="M512 410 584 440 614 512 512 512Z" fill="#dcbf80"/>
+    <path d="M410 512 440 584 512 614 512 512Z" fill="#b08840"/>
+    <path d="M614 512 584 584 512 614 512 512Z" fill="#8a6528"/>
+    <path d="M512 452 554 470 572 512 554 554 512 572 470 554 452 512 470 470Z" fill="url(#iris)"/>
+    <path d="M512 486 538 512 512 538 486 512Z" fill="#041b22" stroke="none"/>
+    <path d="M512 300 600 340 512 326 424 340Z" fill="#e8cf94"/>
+    <path d="M512 724 600 684 512 698 424 684Z" fill="#a37b36"/>
+  </g>
+</svg>

@@ -56,11 +56,10 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         });
 
-    // reuse the app icon for the tray. it should always be present from the
-    // bundle, but if it is missing we simply build a tray without an icon.
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
-    }
+    // the eye alone on a clear background (icons/tray.svg), not the app
+    // icon's tile, which turns to mush at the tray's 16 px. built in, so it
+    // is always there.
+    builder = builder.icon(tauri::include_image!("./icons/tray.png"));
 
     builder.build(app)?;
     Ok(())

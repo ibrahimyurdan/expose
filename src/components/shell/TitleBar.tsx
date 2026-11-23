@@ -45,7 +45,7 @@ export function TitleBar({
       className="titlebar"
     >
       <div className="brand">
-        <Mark size={18} />
+        <Mark size={22} />
         <span className="type-nav">Expose</span>
       </div>
       <Status state={status} />
